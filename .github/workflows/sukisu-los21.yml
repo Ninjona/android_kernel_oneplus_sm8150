@@ -1,0 +1,119 @@
+name: Build OnePlus-Sm8150-Kernel-MKSU-SUSFS-LOS21
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - oneplus/LOS_SM8150_14.0
+  pull_request:
+    branches:
+      - oneplus/LOS_SM8150_14.0
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    env:
+      CCACHE_COMPILERCHECK: "%compiler% -dumpmachine; %compiler% -dumpversion"
+      CCACHE_NOHASHDIR: "true"
+      CCACHE_MAXSIZE: "2G"
+      CCACHE_HARDLINK: "true"
+    steps:
+    - name: Set up ccache
+      uses: hendrikmuhs/ccache-action@v1.2
+
+    - name: Remove unnecessary files
+      run: |
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update -y 
+        sudo apt install -y gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi \
+        clang-14 lld binutils make python3 libssl-dev build-essential bc \
+        bison flex unzip ca-certificates xz-utils mkbootimg cpio \
+        device-tree-compiler git git-lfs libelf-dev libncurses-dev
+        git clone https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9 aarch64 --depth=1
+        git clone https://github.com/grm34/proton-clang -b ZenMaxBuilder clang --depth=1
+        git clone https://github.com/snowwolf725/AnyKernel3 -b oneplus7 --depth=1
+        rm -rf AnyKernel3/.git
+        
+    - name: Checkout kernel source
+      run: |
+        git clone --depth=1 https://github.com/snowwolf725/android_kernel_oneplus_sm8150 -b oneplus/LOS_SM8150_14.0 kernel
+        
+    - name: Apply MKSU and SUSFS patches
+      run: |
+        git clone https://github.com/ShirkNeko/Action_OnePlus_MKSU_SUSFS.git patches
+        cd patches
+        # Apply SUSFS patches
+        git apply susfs_patches/*
+        # Apply MKSU patches
+        git apply mksu_patches/*
+        cd ..
+        
+    - name: Install KernelSU
+      run: |
+        git clone https://github.com/tiann/KernelSU ksu
+        cd ksu
+        git submodule update --init
+        ./install.sh ../kernel
+        cd ..
+        
+    - name: Get Version
+      id: get_version
+      run: |
+        cd ksu
+        count=$(git rev-list --count HEAD)
+        version=$(expr $count + 10200)
+        echo "VERSION=$version" >> $GITHUB_OUTPUT
+        cd ../
+        
+    - name: Build kernel
+      run: |
+        export KERNEL_DEFCONFIG="lineage_sm8150_defconfig"
+        export KERNEL_CMDLINE="ARCH=arm64 CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-androidkernel- CROSS_COMPILE_ARM32=arm-linux-gnueabi- LLVM=1 LLVM_IAS=1 CONFIG_BUILD_ARM64_DT_OVERLAY=n O=out"
+        export PATH=$(pwd)/clang/bin:$(pwd)/aarch64/bin:$PATH
+        export ARCH=arm64
+        export SUBARCH=arm64
+        export LD=ld.lld
+        export BRAND_SHOW_FLAG=oneplus
+        export TARGET_PRODUCT=msmnile
+        
+        cd kernel
+        make $KERNEL_CMDLINE CC="ccache clang" $KERNEL_DEFCONFIG
+        make $KERNEL_CMDLINE CC="ccache clang" -j$(nproc --all)
+        cp out/arch/arm64/boot/Image ../AnyKernel3
+        cd ..
+        
+    - name: Create flashable zip
+      run: |
+        cd AnyKernel3
+        zip -r9 ../OP7-LOS21-MKSU-SUSFS-${{ steps.get_version.outputs.VERSION }}.zip *
+        cd ..
+        
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: OP7-LOS21-MKSU-SUSFS-${{ steps.get_version.outputs.VERSION }}
+        path: OP7-LOS21-MKSU-SUSFS-${{ steps.get_version.outputs.VERSION }}.zip
+        
+    - name: Create release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: OP7-LOS21-MKSU-SUSFS-${{ steps.get_version.outputs.VERSION }}.zip
+        name: MKSU-SUSFS Kernel (${{ steps.get_version.outputs.VERSION }})
+        tag_name: v${{ steps.get_version.outputs.VERSION }}
+        body: |
+          ### OnePlus 7 Series Kernel with MKSU & SUSFS
+          - **Device:** OnePlus 7/7 Pro/7T/7T Pro (sm8150)
+          - **Android Version:** 14 (LineageOS 21)
+          - **Features:**
+            - Magic KernelSU (MKSU) integration
+            - Secure User Space Filesystem (SUSFS)
+          - **Build Date:** ${{ github.run_date }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
