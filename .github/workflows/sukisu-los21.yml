@@ -45,23 +45,30 @@ jobs:
       run: |
         git clone --depth=1 https://github.com/snowwolf725/android_kernel_oneplus_sm8150 -b oneplus/LOS_SM8150_14.0 kernel
         
-    - name: Apply MKSU and SUSFS patches
+    - name: Apply Patches SukiSU Ultra
       run: |
-        git clone https://github.com/ShirkNeko/Action_OnePlus_MKSU_SUSFS.git patches
-        cd patches
-        # Apply SUSFS patches
-        git apply susfs_patches/*
-        # Apply MKSU patches
-        git apply mksu_patches/*
-        cd ..
-        
-    - name: Install KernelSU
-      run: |
-        git clone https://github.com/tiann/KernelSU ksu
-        cd ksu
-        git submodule update --init
-        ./install.sh ../kernel
-        cd ..
+          cd kernel_workspace
+          git clone https://gitlab.com/simonpunk/susfs4ksu.git -b gki-${{ github.event.inputs.ANDROID_VERSION }}-${{ github.event.inputs.KERNEL_VERSION }}
+          git clone https://github.com/ShirkNeko/SukiSU_patch.git
+          cd kernel_platform
+          echo "正在给内核打susfs补丁"
+          
+          # CORRECTED PATH: Use the new directory structure
+          cp ../susfs4ksu/50_add_susfs_in_gki-${{ github.event.inputs.ANDROID_VERSION }}-${{ github.event.inputs.KERNEL_VERSION }}.patch ./common/
+          cp ../susfs4ksu/fs/* ./common/fs/
+          cp ../susfs4ksu/include/linux/* ./common/include/linux/
+
+          if [ "${{ github.event.inputs.ZRAM }}" = "true" ]; then
+          echo "正在给内核打zram补丁"
+          cp -r ../SukiSU_patch/other/zram/lz4k/include/linux/* ./common/include/linux
+          cp -r ../SukiSU_patch/other/zram/lz4k/lib/* ./common/lib
+          cp -r ../SukiSU_patch/other/zram/lz4k/crypto/* ./common/crypto
+          cp -r ../SukiSU_patch/other/zram/lz4k_oplus ./common/lib/
+          fi
+
+          cd ./common
+          patch -p1 < 50_add_susfs_in_gki-${{ github.event.inputs.ANDROID_VERSION }}-${{ github.event.inputs.KERNEL_VERSION }}.patch || true
+          echo "完成"
         
     - name: Get Version
       id: get_version
