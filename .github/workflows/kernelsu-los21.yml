@@ -1,11 +1,11 @@
-name: Build OnePlus-Sm8150-Kernel-LOS21
+name: Build OnePlus-Sm8150-Kernel-SukiSu-LOS21
 on:
   workflow_dispatch:
   push:
     branches:
       - oneplus/LOS_SM8150_14.0
   pull_request:
-    branches:
+      branches:
       - oneplus/LOS_SM8150_14.0
 
 jobs:
@@ -18,7 +18,6 @@ jobs:
       CCACHE_NOHASHDIR: "true"
       CCACHE_MAXSIZE: "2G"
       CCACHE_HARDLINK: "true"
-
     steps:
     - name: Set up ccache
       uses: hendrikmuhs/ccache-action@v1.2
@@ -32,214 +31,72 @@ jobs:
 
     - name: Install dependencies
       run: |
-        sudo apt-get update -y
-        sudo apt install gcc‑aarch64‑linux‑gnu gcc‑arm‑linux‑gnueabi clang‑14 lld \
-          binutils make python3 libssl-dev build-essential bc bison flex unzip \
-          ca-certificates xz-utils mkbootimg cpio device-tree-compiler git git-lfs -y
+        sudo apt-get update -y 
+        sudo apt install gcc-aarch64-linux-gnu -y
+        sudo apt install gcc-arm-linux-gnueabi -y
+        sudo apt install clang-14 lld -y
+        sudo apt install binutils make python3 libssl-dev build-essential bc  bison flex unzip libssl-dev ca-certificates xz-utils mkbootimg cpio device-tree-compiler git git-lfs -y
         git clone https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9 aarch64 --depth=1
         git clone https://github.com/grm34/proton-clang -b ZenMaxBuilder clang --depth=1
         git clone https://github.com/snowwolf725/AnyKernel3 -b oneplus7 --depth=1
         rm -rf AnyKernel3/.git
-
-    - name: Checkout Android 10 kernel source
-      run: |
-        git clone --recurse-submodules https://github.com/snowwolf725/android_kernel_oneplus_sm8150 \
-          -b oneplus/OOS_SM8150_10.0 --depth=1 kernel
-
-    - name: Get Version & clone SukiSU
-      id: get_version
-      run: |
-        # replace embedded KernelSU with your SukiSU‑Ultra module
-        rm -rf kernel/KernelSU
-        git clone https://github.com/SukiSU-Ultra/SukiSU-Ultra.git kernel/KernelSU --depth=1
-
-        cd kernel/KernelSU
-        git rev-list --count HEAD
-        echo "VERSION=$(expr $(git rev-list --count HEAD) + 10200)" >> $GITHUB_OUTPUT
-        cd ../../
-
-    - name: Build Kernel (OOS10)
-      run: |
-        export KERNEL_DEFCONFIG="blu_spark_defconfig"
-        export KERNEL_CMDLINE="ARCH=arm64 CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- LLVM=1 LLVM_IAS=1 O=out"
-        export PATH=$(pwd)/clang/bin/:$(pwd)/aarch64/bin/:$PATH
-        export ARCH=arm64
-        export SUBARCH=arm64
-        export LD=$(which ld.lld)
-        export BRAND_SHOW_FLAG=oneplus
-        export TARGET_PRODUCT=msmnile
-        cd kernel
-        make $KERNEL_CMDLINE $KERNEL_DEFCONFIG
-        make $KERNEL_CMDLINE -j$(nproc --all)
-        cp out/arch/arm64/boot/Image ../AnyKernel3
-        cd ..
-
-    - name: Create AK3 zip for Android 10
-      run: |
-        cd AnyKernel3
-        zip -r ../OP7-OOS10-kernel-SU-${{ steps.get_version.outputs.VERSION }}.zip *
-        cd ..
-
-    - name: Checkout Android 11 kernel source
-      run: |
-        rm -rf kernel
-        git clone --recurse-submodules https://github.com/snowwolf725/android_kernel_oneplus_sm8150 \
-          -b oneplus/OOS_SM8150_11.0 --depth=1 kernel
-
-    - name: Clone SukiSU into kernel (OOS11)
-      run: |
-        rm -rf kernel/KernelSU
-        git clone https://github.com/SukiSU-Ultra/SukiSU-Ultra.git kernel/KernelSU --depth=1
-
-    - name: Build Kernel (OOS11)
-      run: |
-        export KERNEL_DEFCONFIG="blu_spark_defconfig"
-        export KERNEL_CMDLINE="ARCH=arm64 CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-androidkernel- CROSS_COMPILE_ARM32=arm-linux-gnueabi- LLVM=1 LLVM_IAS=1 O=out"
-        export PATH=$(pwd)/clang/bin/:$(pwd)/aarch64/bin/:$PATH
-        export ARCH=arm64
-        export SUBARCH=arm64
-        export LD=$(which ld.lld)
-        export BRAND_SHOW_FLAG=oneplus
-        export TARGET_PRODUCT=msmnile
-        cd kernel
-        make $KERNEL_CMDLINE CC="ccache clang-14" $KERNEL_DEFCONFIG
-        make $KERNEL_CMDLINE CC="ccache clang-14" -j$(nproc --all)
-        cp out/arch/arm64/boot/Image ../AnyKernel3
-        cd ..
-
-    - name: Create AK3 zip for Android 11
-      run: |
-        cd AnyKernel3
-        zip -r ../OP7-OOS11-kernel-SU-${{ steps.get_version.outputs.VERSION }}.zip *
-        cd ..
-
-    - name: Checkout Android 12 kernel source
-      run: |
-        rm -rf kernel
-        git clone --recurse-submodules https://github.com/snowwolf725/android_kernel_oneplus_sm8150 \
-          -b oneplus/OOS_SM8150_12.0 --depth=1 kernel
-
-    - name: Clone SukiSU into kernel (OOS12)
-      run: |
-        rm -rf kernel/KernelSU
-        git clone https://github.com/SukiSU-Ultra/SukiSU-Ultra.git kernel/KernelSU --depth=1
-
-    - name: Build Kernel (OOS12)
-      run: |
-        export KERNEL_DEFCONFIG="vendor/sm8150-perf_defconfig"
-        export KERNEL_CMDLINE="ARCH=arm64 CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-androidkernel- CROSS_COMPILE_ARM32=arm-linux-gnueabi- LLVM=1 LLVM_IAS=1 O=out"
-        export PATH=$(pwd)/clang/bin/:$(pwd)/aarch64/bin/:$PATH
-        export ARCH=arm64
-        export SUBARCH=arm64
-        export LD=$(which ld.lld)
-        export BRAND_SHOW_FLAG=oneplus
-        export TARGET_PRODUCT=msmnile
-        cd kernel
-        make $KERNEL_CMDLINE CC="ccache clang" $KERNEL_DEFCONFIG
-        make $KERNEL_CMDLINE CC="ccache clang" -j$(nproc --all)
-        cp out/arch/arm64/boot/Image ../AnyKernel3
-        cd ..
-
-    - name: Create AK3 zip for Android 12
-      run: |
-        cd AnyKernel3
-        zip -r ../OP7-OOS12-kernel-SU-${{ steps.get_version.outputs.VERSION }}.zip *
-        cd ..
-
-    - name: Checkout Android 13 kernel source
-      run: |
-        rm -rf kernel
-        git clone --recurse-submodules https://github.com/snowwolf725/android_kernel_oneplus_sm8150 \
-          -b oneplus/LOS_SM8150_13.0 --depth=1 kernel
-
-    - name: Clone SukiSU into kernel (LOS20)
-      run: |
-        rm -rf kernel/KernelSU
-        git clone https://github.com/SukiSU-Ultra/SukiSU-Ultra.git kernel/KernelSU --depth=1
-
-    - name: Build Kernel (LOS20)
-      run: |
-        export KERNEL_DEFCONFIG="vendor/sm8150-perf_defconfig"
-        export KERNEL_CMDLINE="ARCH=arm64 CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-androidkernel- CROSS_COMPILE_ARM32=arm-linux-gnueabi- LLVM=1 LLVM_IAS=1 CONFIG_BUILD_ARM64_DT_OVERLAY=n O=out"
-        export PATH=$(pwd)/clang/bin/:$(pwd)/aarch64/bin/:$PATH
-        export ARCH=arm64
-        export SUBARCH=arm64
-        export LD=$(which ld.lld)
-        export BRAND_SHOW_FLAG=oneplus
-        export TARGET_PRODUCT=msmnile
-        cd kernel
-        make $KERNEL_CMDLINE CC="ccache clang" $KERNEL_DEFCONFIG
-        make $KERNEL_CMDLINE CC="ccache clang" -j$(nproc --all)
-        cp out/arch/arm64/boot/Image ../AnyKernel3
-        cd ..
-
-    - name: Create AK3 zip for Android 13
-      run: |
-        cd AnyKernel3
-        zip -r ../OP7-LOS20-kernel-SU-${{ steps.get_version.outputs.VERSION }}.zip *
-        cd ..
-
-    - name: Upload Kernel-SU 13
-      uses: actions/upload-artifact@v4
-      with:
-        name: OP7-LOS20-kernel-SU-${{ steps.get_version.outputs.VERSION }}
-        path: "AnyKernel3/*"
-
+        
     - name: Checkout Android 14 kernel source
       run: |
         rm -rf kernel
-        git clone --recurse-submodules https://github.com/snowwolf725/android_kernel_oneplus_sm8150 \
-          -b oneplus/LOS_SM8150_14.0 --depth=1 kernel
-
-    - name: Clone SukiSU into kernel (LOS21)
+        git clone --depth=1 https://github.com/snowwolf725/android_kernel_oneplus_sm8150 -b oneplus/LOS_SM8150_14.0 kernel
+        
+    - name: Install SukiSu
       run: |
-        rm -rf kernel/KernelSU
-        git clone https://github.com/SukiSU-Ultra/SukiSU-Ultra.git kernel/KernelSU --depth=1
-
-    - name: Setup LOS 21 & add SukiSU
-      run: |
-        export KERNEL_DEFCONFIG="lineage_sm8150_defconfig"
-        export KERNEL_CMDLINE="ARCH=arm64 CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-androidkernel- CROSS_COMPILE_ARM32=arm-linux-gnueabi- LLVM=1 LLVM_IAS=1 CONFIG_BUILD_ARM64_DT_OVERLAY=n O=out"
-        export PATH=$(pwd)/clang/bin/:$(pwd)/aarch64/bin/:$PATH
-        export ARCH=arm64
-        export SUBARCH=arm64
-        export LD=$(which ld.lld)
-        export BRAND_SHOW_FLAG=oneplus
-        export TARGET_PRODUCT=msmnile
-        cd kernel
-        git config --global user.email "bot@sukisu.org"
-        git config --global user.name "SukiSUBot"
-        git add -A && git commit -m "Add SukiSU"
-        make $KERNEL_CMDLINE CC="ccache clang" $KERNEL_DEFCONFIG
-        make $KERNEL_CMDLINE CC="ccache clang" -j$(nproc --all)
-        cp out/arch/arm64/boot/Image ../AnyKernel3
+        git clone https://github.com/sukisu/sukisu.git
+        cd sukiru
+        ./install.sh ../kernel
         cd ..
-
-    - name: Create AK3 zip for Android 14
+        
+    - name: Get Version
+      id: get_version
       run: |
-        cd AnyKernel3
-        zip -r ../OP7-LOS21-kernel-SU-${{ steps.get_version.outputs.VERSION }}.zip *
-        cd ..
+        cd sukiru
+        count=$(git rev-list --count HEAD)
+        version=$(expr $count + 10200)
+        echo "VERSION=$version" >> $GITHUB_OUTPUT
+        cd ../
 
-    - name: Upload Kernel-SU 14
-      uses: actions/upload-artifact@v4
-      with:
-        name: OP7-LOS21-kernel-SU-${{ steps.get_version.outputs.VERSION }}
-        path: "AnyKernel3/*"
-
+    - name: Setup LOS 21
+      run: |
+       export KERNEL_DEFCONFIG="lineage_sm8150_defconfig"
+       export KERNEL_CMDLINE="ARCH=arm64 CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-androidkernel- CROSS_COMPILE_ARM32=arm-linux-gnueabi- LLVM=1 LLVM_IAS=1 CONFIG_BUILD_ARM64_DT_OVERLAY=n O=out"
+       export PATH=$(pwd)/clang/bin/:$(pwd)/aarch64/bin/:$PATH
+       export ARCH=arm64
+       export SUBARCH=arm64
+       export LD=$(which ld.lld)
+       export BRAND_SHOW_FLAG=oneplus
+       export TARGET_PRODUCT=msmnile
+       cd kernel
+       git config --global user.email "bot@sukisu.org"
+       git config --global user.name "SukiSuBot"
+       git add -A && git commit -a -m "Add SukiSu"
+       make $KERNEL_CMDLINE CC="ccache clang" $KERNEL_DEFCONFIG
+       make $KERNEL_CMDLINE CC="ccache clang" -j$(nproc --all)
+       cp out/arch/arm64/boot/Image ../AnyKernel3
+       cd ..
+       
+    - name: Create AK3 zip for android 14
+      run: |
+       cd AnyKernel3
+       zip -r ../OP7-LOS21-SukiSu-${{ steps.get_version.outputs.VERSION }}.zip *
+       cd ..
+       
     - name: Upload to Release
       uses: softprops/action-gh-release@v2
       with:
         files: |
-          OP7-OOS10-kernel-SU-${{ steps.get_version.outputs.VERSION }}.zip
-          OP7-OOS11-kernel-SU-${{ steps.get_version.outputs.VERSION }}.zip
-          OP7-OOS12-kernel-SU-${{ steps.get_version.outputs.VERSION }}.zip
-          OP7-LOS20-kernel-SU-${{ steps.get_version.outputs.VERSION }}.zip
-          OP7-LOS21-kernel-SU-${{ steps.get_version.outputs.VERSION }}.zip
-        name: OnePlus7_kernelsu-${{ steps.get_version.outputs.VERSION }}
+          OP7-LOS21-SukiSu-${{ steps.get_version.outputs.VERSION }}.zip
+        name: OnePlus7_SukiSu-${{ steps.get_version.outputs.VERSION }}
         tag_name: ${{ steps.get_version.outputs.VERSION }}
         body: |
-          Device: Oneplus 7/Oneplus 7Pro/Oneplus 7T/Oneplus 7TPro
-          Target: OOS10, OOS11, OOS12, LOS20, LOS21
+          Device: Oneplus 7/7Pro/7T/7TPro
+          Target: LOS21 (Android 14)
+          Features: SukiSu integration
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
