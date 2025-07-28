@@ -76,9 +76,9 @@ jobs:
       run: |
         rm -rf kernel
         git clone --recurse-submodules https://github.com/snowwolf725/android_kernel_oneplus_sm8150 -b oneplus/OOS_SM8150_11.0 --depth=1 kernel
-        cd kernel/KernelSU
-        git pull
-        cd ../../
+#        cd kernel/KernelSU
+      #  git pull
+      #  cd ../../
     - name: Setup OOS 11
       run: |
        export KERNEL_DEFCONFIG="blu_spark_defconfig"
@@ -103,9 +103,9 @@ jobs:
       run: |
         rm -rf kernel
         git clone --recurse-submodules https://github.com/snowwolf725/android_kernel_oneplus_sm8150 -b oneplus/OOS_SM8150_12.0 --depth=1 kernel
-        cd kernel/KernelSU
-        git pull
-        cd ../../
+#        cd kernel/KernelSU
+      #  git pull
+      #  cd ../../
     - name: Setup OOS 12
       run: |
        export KERNEL_DEFCONFIG="vendor/sm8150-perf_defconfig"
@@ -130,9 +130,9 @@ jobs:
       run: |
         rm -rf kernel
         git clone --recurse-submodules https://github.com/snowwolf725/android_kernel_oneplus_sm8150 -b oneplus/LOS_SM8150_13.0 --depth=1 kernel
-        cd kernel/KernelSU
-        git pull
-        cd ../../
+#        cd kernel/KernelSU
+      #  git pull
+      #  cd ../../
     - name: Setup LOS 20
       run: |
        export KERNEL_DEFCONFIG="vendor/sm8150-perf_defconfig"
@@ -162,9 +162,9 @@ jobs:
       run: |
         rm -rf kernel
         git clone --recurse-submodules https://github.com/snowwolf725/android_kernel_oneplus_sm8150 -b oneplus/LOS_SM8150_14.0 --depth=1 kernel
-        cd kernel/KernelSU
-        git pull
-        cd ../../
+#        cd kernel/KernelSU
+      #  git pull
+      #  cd ../../
     - name: Setup LOS 21
       run: |
        export KERNEL_DEFCONFIG="lineage_sm8150_defconfig"
@@ -178,7 +178,6 @@ jobs:
        cd kernel
        git config --global user.email "bot@kernelsu.org"
        git config --global user.name "KernelSUBot"
-      # git add -A && git commit -a -m "Add KernelSU"
        make $KERNEL_CMDLINE CC="ccache clang" $KERNEL_DEFCONFIG
        make $KERNEL_CMDLINE CC="ccache clang" -j$(nproc --all)
        cp out/arch/arm64/boot/Image ../AnyKernel3
