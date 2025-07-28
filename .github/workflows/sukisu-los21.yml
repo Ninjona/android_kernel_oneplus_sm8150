@@ -1,4 +1,4 @@
-name: Build OnePlus‑Sm8150‑Kernel‑LOS21‑MKSU-SUSFS
+name: Build OnePlus‑Sm8150‑Kernel‑LOS21
 on:
   workflow_dispatch:
   push:
@@ -14,10 +14,6 @@ jobs:
     permissions:
       contents: write
 
-    env:
-      KBUILD_BUILD_USER: GitHub
-      KBUILD_BUILD_HOST: actions
-
     steps:
     - name: Install dependencies
       run: |
@@ -25,19 +21,17 @@ jobs:
         sudo apt-get install -y \
           git git-lfs python3 python3-pip libssl-dev \
           gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi \
-          binutils make cpio lz4 xz-utils mkbootimg device-tree-compiler
-        sudo apt-get install -y clang-14 lld
+          binutils make cpio lz4 xz-utils mkbootimg device-tree-compiler clang-14 lld
 
-    - name: Cache toolchains and sources
+    - name: Cache toolchains
       uses: actions/cache@v4.2.3
       with:
         path: |
           aarch64
           clang
-          MKSU
-        key: ${{ runner.os }}-mksu-toolchain-cache
+        key: ${{ runner.os }}-toolchain-cache
         restore-keys: |
-          ${{ runner.os }}-mksu-toolchain-cache
+          ${{ runner.os }}-toolchain-cache
         enableCrossOsArchive: false
 
     - name: Clone toolchains and AnyKernel3
@@ -47,40 +41,15 @@ jobs:
         git clone --depth=1 https://github.com/snowwolf725/AnyKernel3 -b oneplus7 AnyKernel3
         rm -rf AnyKernel3/.git
 
-    - name: Checkout kernel source (Android 14)
+    - name: Checkout kernel source
       run: |
-        git clone --depth=1 https://github.com/snowwolf725/android_kernel_oneplus_sm8150 -b oneplus/LOS_SM8150_14.0 kernel
-
-    - name: Remove legacy KernelSU
-      run: |
-        rm -rf kernel/KernelSU
-
-    - name: Fetch MKSU & SUSFS integration
-      run: |
-        git clone --depth=1 https://github.com/ShirkNeko/Action_OnePlus_MKSU_SUSFS.git MKSU
-
-    - name: Integrate MKSU into kernel tree
-      run: |
-        # Copy MKSU patch scripts and source into kernel folder
-        cp -r MKSU/mksu kernel/KernelSU
-        # Run integration script if present
-        if [ -f kernel/KernelSU/setup.sh ]; then
-          bash kernel/KernelSU/setup.sh
-        fi
+        git clone --depth=1 https://github.com/OnePlusOSS/android_kernel_oneplus_sm8150 -b oneplus/LOS_SM8150_14.0 kernel
 
     - name: Prepare kernel config
       run: |
         cd kernel/arch/arm64/configs
-        # Use default defconfig then append MKSU configs
         KDEF=oneplus_7pro_v_defconfig
         make $KDEF
-        # Enable MKSU & SUSFS
-        echo "CONFIG_KSU=y" >> $KDEF
-        echo "CONFIG_KSU_SUSFS=y" >> $KDEF
-        echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" >> $KDEF
-        echo "CONFIG_MODULES=y" >> $KDEF
-        echo "CONFIG_KALLSYMS=y" >> $KDEF
-        cd ../../..
 
     - name: Build kernel
       run: |
@@ -93,27 +62,19 @@ jobs:
       run: |
         cd AnyKernel3
         cp ../kernel/out/arch/arm64/boot/Image.gz-dtb Image.gz-dtb
-        zip -r OP7-LOS21-MKSU_SUSFS.zip .
-
-    - name: Get MKSU version
-      id: get_version
-      run: |
-        cd MKSU
-        COUNT=$(git rev-list --count HEAD)
-        SHORT=$(git rev-parse --short HEAD)
-        echo "VERSION=MKSU-${COUNT}-${SHORT}" >> $GITHUB_OUTPUT
+        zip -r OP7-LOS21.zip .
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: OP7-LOS21-MKSU_SUSFS-${{ steps.get_version.outputs.VERSION }}
-        path: AnyKernel3/OP7-LOS21-MKSU_SUSFS.zip
+        name: OP7-LOS21-${{ github.run_number }}
+        path: AnyKernel3/OP7-LOS21.zip
 
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v2
       with:
-        files: AnyKernel3/OP7-LOS21-MKSU_SUSFS.zip
-        tag_name: ${{ steps.get_version.outputs.VERSION }}
-        name: OnePlus7Pro-MKSU-${{ steps.get_version.outputs.VERSION }}
+        files: AnyKernel3/OP7-LOS21.zip
+        tag_name: OP7-LOS21-${{ github.run_number }}
+        name: OnePlus7Pro-LOS21-${{ github.run_number }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
