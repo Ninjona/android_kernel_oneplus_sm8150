@@ -49,7 +49,7 @@ jobs:
 
     - name: Checkout kernel source (Android 14)
       run: |
-        git clone --depth=1 https://github.com/OnePlusOSS/android_kernel_oneplus_sm8150 -b oneplus/LOS_SM8150_14.0 kernel
+        git clone --depth=1 https://github.com/snowwolf725/android_kernel_oneplus_sm8150 -b oneplus/LOS_SM8150_14.0 kernel
 
     - name: Remove legacy KernelSU
       run: |
