@@ -1,4 +1,3 @@
-# date() calls removed for GitHub Actions compatibility
 name: Build OnePlus‑Sm8150‑Kernel‑LOS21‑MKSU-SUSFS
 on:
   workflow_dispatch:
@@ -105,7 +104,7 @@ jobs:
         echo "VERSION=MKSU-${COUNT}-${SHORT}" >> $GITHUB_OUTPUT
 
     - name: Upload artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: OP7-LOS21-MKSU_SUSFS-${{ steps.get_version.outputs.VERSION }}
         path: AnyKernel3/OP7-LOS21-MKSU_SUSFS.zip
