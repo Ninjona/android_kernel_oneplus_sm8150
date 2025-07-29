@@ -16,7 +16,7 @@ jobs:
 
     env:
       # Enable ccache
-      CCACHE_DIR: ${{ runner.home }}/.ccache
+      CCACHE_DIR: $HOME/.ccache
       CCACHE_MAXSIZE: 10G
 
     steps:
@@ -38,7 +38,7 @@ jobs:
     - name: Cache ccache
       uses: actions/cache@v4
       with:
-        path: ${{ runner.home }}/.ccache
+        path: $HOME/.ccache
         key: ${{ runner.os }}-ccache
         restore-keys: |
           ${{ runner.os }}-ccache
