@@ -15,7 +15,7 @@ jobs:
       contents: write
 
     env:
-      # Enable ccache
+      # ccache settings
       CCACHE_DIR: $HOME/.ccache
       CCACHE_MAXSIZE: 10G
 
@@ -61,7 +61,7 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-build-cache-
 
-    - name: Clone toolchains and AnyKernel3 (if cache miss)
+    - name: Clone toolchains and AnyKernel3 (cache miss)
       if: steps.cache-repos.outputs.cache-hit != 'true'
       run: |
         git clone --depth=1 https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9 aarch64
@@ -69,29 +69,24 @@ jobs:
         git clone --depth=1 https://github.com/snowwolf725/AnyKernel3 -b oneplus7 AnyKernel3
         rm -rf AnyKernel3/.git
 
-    - name: Checkout kernel source (if cache miss)
+    - name: Checkout kernel source (cache miss)
       if: steps.cache-repos.outputs.cache-hit != 'true'
       run: |
         git clone --depth=1 https://github.com/snowwolf725/android_kernel_oneplus_sm8150 -b oneplus/LOS_SM8150_14.0 kernel
+
+    - name: Remove KernelSU remnants
+      run: |
+        rm -rf kernel/KernelSU kernel/drivers/kernelsu
 
     - name: Build kernel
       run: |
         export PATH=/usr/lib/ccache:$PATH
         export PATH=$(pwd)/clang/bin:$(pwd)/aarch64/bin:$PATH
         cd kernel
-        # Use default defconfig for this branch
-        make O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-android- defconfig
+        # Use OnePlus 7 Pro defconfig
+        make oneplus_7pro_v_defconfig O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-android-
         # Build kernel
         make -j$(nproc) O=out ARCH=arm64 \
-          CC="ccache clang" \
-          CLANG_TRIPLE=aarch64-linux-gnu- \
-          CROSS_COMPILE="ccache aarch64-linux-android-"
-        run: |
-         export PATH=/usr/lib/ccache:$PATH
-         export PATH=$(pwd)/clang/bin:$(pwd)/aarch64/bin:$PATH
-         cd kernel
-         make O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-android- oneplus_7pro_v_defconfig
-         make -j$(nproc) O=out ARCH=arm64 \
           CC="ccache clang" \
           CLANG_TRIPLE=aarch64-linux-gnu- \
           CROSS_COMPILE="ccache aarch64-linux-android-"
