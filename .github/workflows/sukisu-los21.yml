@@ -14,36 +14,65 @@ jobs:
     permissions:
       contents: write
 
+    env:
+      # Enable ccache
+      CCACHE_DIR: ${{ runner.home }}/.ccache
+      CCACHE_MAXSIZE: 10G
+
     steps:
+    - name: Cache apt packages
+      uses: actions/cache@v4
+      with:
+        path: /var/cache/apt/archives
+        key: ${{ runner.os }}-apt-packages
+
     - name: Install dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y \
           git git-lfs python3 python3-pip libssl-dev \
           gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi \
-          binutils make cpio lz4 xz-utils mkbootimg device-tree-compiler clang-14 lld
+          binutils make cpio lz4 xz-utils mkbootimg device-tree-compiler \
+          clang-14 lld ccache
 
-    - name: Cache toolchains
-      uses: actions/cache@v4.2.3
+    - name: Cache ccache
+      uses: actions/cache@v4
+      with:
+        path: ${{ runner.home }}/.ccache
+        key: ${{ runner.os }}-ccache
+        restore-keys: |
+          ${{ runner.os }}-ccache
+
+    - name: Setup ccache
+      run: |
+        ccache --max-size=$CCACHE_MAXSIZE
+        echo "Cache hit: $(ccache -s | grep 'cache hit rate')"
+
+    - name: Cache build repos
+      id: cache-repos
+      uses: actions/cache@v4
       with:
         path: |
           aarch64
           clang
-        key: ${{ runner.os }}-toolchain-cache
+          kernel
+          AnyKernel3
+        key: ${{ runner.os }}-build-cache-${{ github.ref_name }}
         restore-keys: |
-          ${{ runner.os }}-toolchain-cache
-        enableCrossOsArchive: false
+          ${{ runner.os }}-build-cache-
 
-    - name: Clone toolchains and AnyKernel3
+    - name: Clone toolchains and AnyKernel3 (if cache miss)
+      if: steps.cache-repos.outputs.cache-hit != 'true'
       run: |
         git clone --depth=1 https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9 aarch64
         git clone --depth=1 https://github.com/grm34/proton-clang -b ZenMaxBuilder clang
         git clone --depth=1 https://github.com/snowwolf725/AnyKernel3 -b oneplus7 AnyKernel3
         rm -rf AnyKernel3/.git
 
-    - name: Checkout kernel source
+    - name: Checkout kernel source (if cache miss)
+      if: steps.cache-repos.outputs.cache-hit != 'true'
       run: |
-        git clone --depth=1 https://github.com/OnePlusOSS/android_kernel_oneplus_sm8150 -b oneplus/LOS_SM8150_14.0 kernel
+        git clone --depth=1 https://github.com/snowwolf725/android_kernel_oneplus_sm8150 -b oneplus/LOS_SM8150_14.0 kernel
 
     - name: Prepare kernel config
       run: |
@@ -53,10 +82,14 @@ jobs:
 
     - name: Build kernel
       run: |
+        export PATH=/usr/lib/ccache:$PATH
         export PATH=$(pwd)/clang/bin:$(pwd)/aarch64/bin:$PATH
         cd kernel
         make O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-android- oneplus_7pro_v_defconfig
-        make -j$(nproc) O=out ARCH=arm64 CC=clang CLANG_TRIPLE=aarch64-linux-gnu-
+        make -j$(nproc) O=out ARCH=arm64 \
+          CC="ccache clang" \
+          CLANG_TRIPLE=aarch64-linux-gnu- \
+          CROSS_COMPILE="ccache aarch64-linux-android-"
 
     - name: Package boot image
       run: |
