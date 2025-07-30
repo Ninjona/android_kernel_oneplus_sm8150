@@ -1,11 +1,14 @@
-name: Build OnePlus‑Sm8150‑Kernel‑LOS21
+name: Build OnePlus-Sm8150-Kernel-LOS21
 on:
-  workflow_dispatch:
+#  workflow_dispatch:
+#  schedule:
+      # Run once a week on Sunday at midnight. See http://crontab.guru
+#      - cron: '0 21 * * *'
   push:
     branches:
       - oneplus/LOS_SM8150_14.0
   pull_request:
-    branches:
+      branches:
       - oneplus/LOS_SM8150_14.0
 
 jobs:
@@ -13,101 +16,182 @@ jobs:
     runs-on: ubuntu-22.04
     permissions:
       contents: write
-
     env:
-      # ccache settings
-      CCACHE_DIR: $HOME/.ccache
-      CCACHE_MAXSIZE: 10G
-
+      CCACHE_COMPILERCHECK: "%compiler% -dumpmachine; %compiler% -dumpversion"
+      CCACHE_NOHASHDIR: "true"
+      CCACHE_MAXSIZE: "2G"
+      CCACHE_HARDLINK: "true"
     steps:
-    - name: Cache apt packages
-      uses: actions/cache@v4
-      with:
-        path: /var/cache/apt/archives
-        key: ${{ runner.os }}-apt-packages
-
+    - name: Set up ccache
+      uses: hendrikmuhs/ccache-action@v1.2
+    - name: Remove unnecessary files
+      run: |
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+        
     - name: Install dependencies
       run: |
-        sudo apt-get update
-        sudo apt-get install -y \
-          git git-lfs python3 python3-pip libssl-dev \
-          gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi \
-          binutils make cpio lz4 xz-utils mkbootimg device-tree-compiler \
-          clang-14 lld ccache
-
-    - name: Cache ccache
-      uses: actions/cache@v4
-      with:
-        path: $HOME/.ccache
-        key: ${{ runner.os }}-ccache
-        restore-keys: |
-          ${{ runner.os }}-ccache
-
-    - name: Setup ccache
-      run: |
-        ccache --max-size=$CCACHE_MAXSIZE
-        echo "Cache hit: $(ccache -s | grep 'cache hit rate')"
-
-    - name: Cache build repos
-      id: cache-repos
-      uses: actions/cache@v4
-      with:
-        path: |
-          aarch64
-          clang
-          kernel
-          AnyKernel3
-        key: ${{ runner.os }}-build-cache-${{ github.ref_name }}
-        restore-keys: |
-          ${{ runner.os }}-build-cache-
-
-    - name: Clone toolchains and AnyKernel3 (cache miss)
-      if: steps.cache-repos.outputs.cache-hit != 'true'
-      run: |
-        git clone --depth=1 https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9 aarch64
-        git clone --depth=1 https://github.com/grm34/proton-clang -b ZenMaxBuilder clang
-        git clone --depth=1 https://github.com/snowwolf725/AnyKernel3 -b oneplus7 AnyKernel3
+        sudo apt-get update -y 
+        sudo apt install gcc-aarch64-linux-gnu -y
+        sudo apt install gcc-arm-linux-gnueabi -y
+        sudo apt install clang-14 -y
+        sudo apt install binutils make python3 libssl-dev build-essential bc  bison flex unzip libssl-dev ca-certificates xz-utils mkbootimg cpio device-tree-compiler git git-lfs -y
+        git clone https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9 aarch64 --depth=1
+        git clone https://github.com/grm34/proton-clang -b ZenMaxBuilder clang --depth=1
+        git clone https://github.com/snowwolf725/AnyKernel3 -b oneplus7 --depth=1
         rm -rf AnyKernel3/.git
-
-    - name: Checkout kernel source (cache miss)
-      if: steps.cache-repos.outputs.cache-hit != 'true'
+        
+    - name: Checkout Android 10 kernel source
       run: |
-        git clone --depth=1 https://github.com/snowwolf725/android_kernel_oneplus_sm8150 -b oneplus/LOS_SM8150_14.0 kernel
+        git clone --recurse-submodules https://github.com/snowwolf725/android_kernel_oneplus_sm8150 -b oneplus/OOS_SM8150_10.0 --depth=1 kernel
 
-    - name: Remove KernelSU remnants
+    - name: Build Kernel
       run: |
-        rm -rf kernel/KernelSU kernel/drivers/kernelsu
-
-    - name: Build kernel
+       export KERNEL_DEFCONFIG="blu_spark_defconfig"
+       export KERNEL_CMDLINE="ARCH=arm64 CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- LLVM=1 LLVM_IAS=1 O=out"
+       export PATH=$(pwd)/clang/bin/:$(pwd)/aarch64/bin/:$PATH
+       export ARCH=arm64
+       export SUBARCH=arm64
+       export LD=ld.lld
+       export BRAND_SHOW_FLAG=oneplus
+       export TARGET_PRODUCT=msmnile
+       cd kernel
+       make $KERNEL_CMDLINE $KERNEL_DEFCONFIG
+       make $KERNEL_CMDLINE -j$(nproc --all)
+       cp out/arch/arm64/boot/Image ../AnyKernel3
+       cd ..
+    - name: Create AK3 zip for android 10
       run: |
-        export PATH=/usr/lib/ccache:$PATH
-        export PATH=$(pwd)/clang/bin:$(pwd)/aarch64/bin:$PATH
-        cd kernel
-        # Use OnePlus 7 Pro defconfig
-        make oneplus_7pro_v_defconfig O=out ARCH=arm64 CROSS_COMPILE=aarch64-linux-android-
-        # Build kernel
-        make -j$(nproc) O=out ARCH=arm64 \
-          CC="ccache clang" \
-          CLANG_TRIPLE=aarch64-linux-gnu- \
-          CROSS_COMPILE="ccache aarch64-linux-android-"
-
-    - name: Package boot image
+       cd AnyKernel3
+       zip -r ../OP7-OOS10.zip *
+       cd ..
+    - name: Checkout Android 11 kernel source
       run: |
-        cd AnyKernel3
-        cp ../kernel/out/arch/arm64/boot/Image.gz-dtb Image.gz-dtb
-        zip -r OP7-LOS21.zip .
+        rm -rf kernel
+        git clone --recurse-submodules https://github.com/snowwolf725/android_kernel_oneplus_sm8150 -b oneplus/OOS_SM8150_11.0 --depth=1 kernel
 
-    - name: Upload artifact
+    - name: Setup OOS 11
+      run: |
+       export KERNEL_DEFCONFIG="blu_spark_defconfig"
+       export KERNEL_CMDLINE="ARCH=arm64 CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-androidkernel- CROSS_COMPILE_ARM32=arm-linux-gnueabi- LLVM=1 LLVM_IAS=1 O=out"
+       export PATH=$(pwd)/clang/bin/:$(pwd)/aarch64/bin/:$PATH
+       export ARCH=arm64
+       export SUBARCH=arm64
+       export LD=ld.lld
+       export BRAND_SHOW_FLAG=oneplus
+       export TARGET_PRODUCT=msmnile
+       cd kernel
+       make $KERNEL_CMDLINE CC="ccache clang-14" $KERNEL_DEFCONFIG
+       make $KERNEL_CMDLINE CC="ccache clang-14" -j$(nproc --all)
+       cp out/arch/arm64/boot/Image ../AnyKernel3
+       cd ..
+    - name: Create AK3 zip for android 11
+      run: |
+       cd AnyKernel3
+       zip -r ../OP7-OOS11.zip *
+       cd ..
+    - name: Checkout Android 12 kernel source
+      run: |
+        rm -rf kernel
+        git clone --recurse-submodules https://github.com/snowwolf725/android_kernel_oneplus_sm8150 -b oneplus/OOS_SM8150_12.0 --depth=1 kernel
+
+    - name: Setup OOS 12
+      run: |
+       export KERNEL_DEFCONFIG="vendor/sm8150-perf_defconfig"
+       export KERNEL_CMDLINE="ARCH=arm64 CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-androidkernel- CROSS_COMPILE_ARM32=arm-linux-gnueabi- LLVM=1 LLVM_IAS=1 O=out"
+       export PATH=$(pwd)/clang/bin/:$(pwd)/aarch64/bin/:$PATH
+       export ARCH=arm64
+       export SUBARCH=arm64
+       export LD=ld.lld
+       export BRAND_SHOW_FLAG=oneplus
+       export TARGET_PRODUCT=msmnile
+       cd kernel
+       make $KERNEL_CMDLINE CC="ccache clang" $KERNEL_DEFCONFIG
+       make $KERNEL_CMDLINE CC="ccache clang" -j$(nproc --all)
+       cp out/arch/arm64/boot/Image ../AnyKernel3
+       cd ..
+    - name: Create AK3 zip for android 12
+      run: |
+       cd AnyKernel3
+       zip -r ../OP7-OOS12.zip *
+       cd ..
+    - name: Checkout Android 13 kernel source
+      run: |
+        rm -rf kernel
+        git clone --recurse-submodules https://github.com/Ninjona/android_kernel_oneplus_sm8150/edit/oneplus/LOS_SM8150_14.0/ -b oneplus/LOS_SM8150_13.0 --depth=1 kernel
+    - name: Setup LOS 20
+      run: |
+       export KERNEL_DEFCONFIG="vendor/sm8150-perf_defconfig"
+       export KERNEL_CMDLINE="ARCH=arm64 CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-androidkernel- CROSS_COMPILE_ARM32=arm-linux-gnueabi- LLVM=1 LLVM_IAS=1 CONFIG_BUILD_ARM64_DT_OVERLAY=n O=out"
+       export PATH=$(pwd)/clang/bin/:$(pwd)/aarch64/bin/:$PATH
+       export ARCH=arm64
+       export SUBARCH=arm64
+       export LD=ld.lld
+       export BRAND_SHOW_FLAG=oneplus
+       export TARGET_PRODUCT=msmnile
+       cd kernel
+       make $KERNEL_CMDLINE CC="ccache clang" $KERNEL_DEFCONFIG
+       make $KERNEL_CMDLINE CC="ccache clang" -j$(nproc --all)
+       cp out/arch/arm64/boot/Image ../AnyKernel3
+       cd ..
+    - name: Create AK3 zip for android 13
+      run: |
+       cd AnyKernel3
+       zip -r ../OP7-LOS20.zip *
+       cd ..
+    - name: Upload Kernel-SU 13
       uses: actions/upload-artifact@v4
       with:
-        name: OP7-LOS21-${{ github.run_number }}
-        path: AnyKernel3/OP7-LOS21.zip
+        name: OP7-LOS20
+        path: "AnyKernel3/*"
+    - name: Checkout Android 14 kernel source
+      run: |
+        rm -rf kernel
+        git clone --recurse-submodules https://github.com/snowwolf725/android_kernel_oneplus_sm8150 -b oneplus/LOS_SM8150_14.0 --depth=1 kernel
 
-    - name: Create GitHub Release
+    - name: Setup LOS 21
+      run: |
+       export KERNEL_DEFCONFIG="lineage_sm8150_defconfig"
+       export KERNEL_CMDLINE="ARCH=arm64 CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-androidkernel- CROSS_COMPILE_ARM32=arm-linux-gnueabi- LLVM=1 LLVM_IAS=1 CONFIG_BUILD_ARM64_DT_OVERLAY=n O=out"
+       export PATH=$(pwd)/clang/bin/:$(pwd)/aarch64/bin/:$PATH
+       export ARCH=arm64
+       export SUBARCH=arm64
+       export LD=ld.lld
+       export BRAND_SHOW_FLAG=oneplus
+       export TARGET_PRODUCT=msmnile
+       cd kernel
+       git config --global user.email "bot@kernelsu.org"
+       git config --global user.name "KernelSUBot"
+       git add -A && git commit -a -m "Add KernelSU"
+       make $KERNEL_CMDLINE CC="ccache clang" $KERNEL_DEFCONFIG
+       make $KERNEL_CMDLINE CC="ccache clang" -j$(nproc --all)
+       cp out/arch/arm64/boot/Image ../AnyKernel3
+       cd ..
+    - name: Create AK3 zip for android 14
+      run: |
+       cd AnyKernel3
+       zip -r ../OP7-LOS21.zip *
+       cd ..
+    - name: Upload Kernel-SU 14
+      uses: actions/upload-artifact@v4
+      with:
+        name: OP7-LOS21
+        path: "AnyKernel3/*"
+    - name: Upload to Release
       uses: softprops/action-gh-release@v2
       with:
-        files: AnyKernel3/OP7-LOS21.zip
-        tag_name: OP7-LOS21-${{ github.run_number }}
-        name: OnePlus7Pro-LOS21-${{ github.run_number }}
+        files: |
+          OP7-OOS10.zip
+          OP7-OOS11.zip
+          OP7-OOS12.zip
+          OP7-LOS20.zip
+          OP7-LOS21.zip
+        name: OnePlus7_kernelsu
+        tag_name: ${{ steps.get_version.outputs.VERSION }}
+        body: |
+          Device: Oneplus 7/Oneplus 7Pro/Oneplus 7T/Oneplus 7TPro
+          Target: OOS10, OOS11, OOS12, LOS20,  LOS21
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
