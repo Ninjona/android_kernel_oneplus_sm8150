@@ -55,12 +55,17 @@ jobs:
         export BRAND_SHOW_FLAG=oneplus
         export TARGET_PRODUCT=msmnile
         cd kernel
-        # Integrate SukiSU Ultra (Non-GKI branch)
-        curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s nongki
-        # Remove .git to bypass cleanliness check in out-of-tree build
-        rm -rf .git
+        # Pull latest SukiSU Ultra integration
+        cd KernelSU
+        git pull https://github.com/SukiSU-Ultra/SukiSU-Ultra.git main
+        cd ..
+        # Configure bot identity and commit integration
+        git config --global user.email "bot@sukisu-ultra.com"
+        git config --global user.name "SukiSUBot"
+        git add KernelSU
+        git commit -m "Integrate SukiSU Ultra (Non-GKI branch)"
         # Generate initial .config from defconfig
-        make $KERNEL_CMDLINE CC="ccache clang" $KERNEL_DEFCONFIG
+        make $KERNEL_CMDLINE CC="ccache clang" lineage_sm8150_defconfig
         # Enable required kernel configs
         scripts/config --file .config --enable KPM
         scripts/config --file .config --enable KALLSYMS
