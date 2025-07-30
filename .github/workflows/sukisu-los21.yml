@@ -41,7 +41,12 @@ jobs:
         git clone https://github.com/grm34/proton-clang -b ZenMaxBuilder clang --depth=1
         git clone https://github.com/snowwolf725/AnyKernel3 -b oneplus7 --depth=1
         rm -rf AnyKernel3/.git
+
         
+    - name: Checkout Android 14 kernel source
+      run: |
+        rm -rf kernel
+        git clone --recurse-submodules https://github.com/snowwolf725/android_kernel_oneplus_sm8150 -b oneplus/LOS_SM8150_14.0 --depth=1 kernel
 
     - name: Setup LOS 21
       run: |
