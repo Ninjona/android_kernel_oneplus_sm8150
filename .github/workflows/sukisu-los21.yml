@@ -74,7 +74,7 @@ jobs:
         files: |
           OP7-LOS21.zip
         name: OnePlus7_kernelsu
-        tag_name: ${{ steps.get_version.outputs.VERSION }}
+        tag_name: test
         body: |
           Device: Oneplus 7/Oneplus 7Pro/Oneplus 7T/Oneplus 7TPro
           Target: LOS21
