@@ -39,6 +39,14 @@ jobs:
         git clone https://github.com/snowwolf725/AnyKernel3 -b oneplus7 --depth=1
         rm -rf AnyKernel3/.git
 
+      
+    # -------------------- FIX STARTS HERE --------------------
+    - name: Clean kernel source (mrproper + git clean)
+      run: |
+        make -C kernel mrproper
+        git -C kernel clean -fdx
+    # -------------------- FIX ENDS HERE ----------------------
+
     - name: Checkout Android 14 kernel source
       run: |
         rm -rf kernel
