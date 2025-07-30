@@ -57,6 +57,8 @@ jobs:
         cd kernel
         # Integrate SukiSU Ultra (Non-GKI branch)
         curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s nongki
+        # Remove .git to bypass cleanliness check in out-of-tree build
+        rm -rf .git
         # Generate initial .config from defconfig
         make $KERNEL_CMDLINE CC="ccache clang" $KERNEL_DEFCONFIG
         # Enable required kernel configs
