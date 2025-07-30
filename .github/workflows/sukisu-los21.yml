@@ -42,7 +42,7 @@ jobs:
     - name: Checkout Android 14 kernel source
       run: |
         rm -rf kernel
-        git clone --recurse-submodules https://github.com/LineageOS/android_kernel_oneplus_sm8150 -b oneplus/LOS_SM8150_14.0 --depth=1 kernel
+        git clone --recurse-submodules https://github.com/snowwolf725/android_kernel_oneplus_sm8150 -b oneplus/LOS_SM8150_14.0 --depth=1 kernel
 
     - name: Setup LOS 21 and integrate SukiSU Ultra
       run: |
