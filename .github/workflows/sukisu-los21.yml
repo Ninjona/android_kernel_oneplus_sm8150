@@ -45,7 +45,7 @@ jobs:
         
     - name: Checkout Android 10 kernel source
       run: |
-        git clone --recurse-submodules https://github.com/snowwolf725/android_kernel_oneplus_sm8150 -b oneplus/OOS_SM8150_10.0 --depth=1 kernel
+        git clone --recurse-submodules https://github.com/Ninjona/android_kernel_oneplus_sm8150/ -b oneplus/OOS_SM8150_10.0 --depth=1 kernel
 
     - name: Build Kernel
       run: |
@@ -70,7 +70,7 @@ jobs:
     - name: Checkout Android 11 kernel source
       run: |
         rm -rf kernel
-        git clone --recurse-submodules https://github.com/snowwolf725/android_kernel_oneplus_sm8150 -b oneplus/OOS_SM8150_11.0 --depth=1 kernel
+        git clone --recurse-submodules https://github.com/Ninjona/android_kernel_oneplus_sm8150/ -b oneplus/OOS_SM8150_11.0 --depth=1 kernel
 
     - name: Setup OOS 11
       run: |
@@ -95,7 +95,7 @@ jobs:
     - name: Checkout Android 12 kernel source
       run: |
         rm -rf kernel
-        git clone --recurse-submodules https://github.com/snowwolf725/android_kernel_oneplus_sm8150 -b oneplus/OOS_SM8150_12.0 --depth=1 kernel
+        git clone --recurse-submodules https://github.com/Ninjona/android_kernel_oneplus_sm8150/ -b oneplus/OOS_SM8150_12.0 --depth=1 kernel
 
     - name: Setup OOS 12
       run: |
@@ -149,7 +149,7 @@ jobs:
     - name: Checkout Android 14 kernel source
       run: |
         rm -rf kernel
-        git clone --recurse-submodules https://github.com/snowwolf725/android_kernel_oneplus_sm8150 -b oneplus/LOS_SM8150_14.0 --depth=1 kernel
+        git clone --recurse-submodules https://github.com/Ninjona/android_kernel_oneplus_sm8150/ -b oneplus/LOS_SM8150_14.0 --depth=1 kernel
 
     - name: Setup LOS 21
       run: |
