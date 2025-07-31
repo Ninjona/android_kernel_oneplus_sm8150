@@ -1,8 +1,8 @@
 name: Build OnePlus-Sm8150-Kernel-LOS21
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '0 0 * * *'  # Daily at midnight UTC; adjust as needed
+#  schedule:
+#    - cron: '0 0 * * *'  # Daily at midnight UTC; adjust as needed
   push:
     branches:
       - oneplus/LOS_SM8150_14.0
@@ -90,10 +90,8 @@ jobs:
       - name: Checkout kernel source
         run: |
           rm -rf kernel
-          git clone --no-checkout https://github.com/LineageOS/android_kernel_oneplus_sm8150.git \
-            -b lineage-21 --depth=1 kernel
-          cd kernel
-          git checkout --recurse-submodules HEAD
+          git clone --recurse-submodules https://github.com/snowwolf725/android_kernel_oneplus_sm8150 \
+            -b oneplus/LOS_SM8150_14.0 --depth=1 kernel
 
       - name: Configure build environment
         run: |
