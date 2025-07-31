@@ -108,7 +108,7 @@ jobs:
       with:
         files: |
           OP7-LOS21.zip
-        name: OnePlus7_kernelsu-v${{ github.run_number }}  # Include version in release name
+        name: OnePlus7_SukiSU-v${{ github.run_number }}  # Include version in release name
         tag_name: v${{ github.run_number }}  # Dynamic version tag based on run number
         body: |
           Device: Oneplus 7/Oneplus 7Pro/Oneplus 7T/Oneplus 7TPro
