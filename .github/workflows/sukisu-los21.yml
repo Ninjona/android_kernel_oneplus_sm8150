@@ -97,11 +97,14 @@ jobs:
       - name: Generate defconfig
         run: |
           cd kernel
-          # Generate .config using defconfig and Clang triple
-          make $KERNEL_DEFCONFIG CC="ccache clang --target=$CLANG_TRIPLE"
+          # Generate .config using defconfig
+          make $KERNEL_DEFCONFIG CC="ccache clang"
           ls -l .config
 
       - name: Compile kernel
+        run: |
+          cd kernel
+          make CC="ccache clang" -j$(nproc)
         run: |
           cd kernel
           make CC="ccache clang --target=$CLANG_TRIPLE" -j$(nproc)
