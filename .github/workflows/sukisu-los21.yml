@@ -1,8 +1,8 @@
 name: Build OnePlus-Sm8150-Kernel-LOS21
 on:
   workflow_dispatch:
-#  schedule:
-#    - cron: '0 0 * * *'  # Daily at midnight UTC; adjust as needed
+  schedule:
+    - cron: '0 0 * * *'  # Daily at midnight UTC; adjust as needed
   push:
     branches:
       - oneplus/LOS_SM8150_14.0
@@ -16,6 +16,14 @@ jobs:
     permissions:
       contents: write
     env:
+      CCACHE_COMPILERCHECK: "%compiler% -dumpmachine; %compiler% -dumpversion"
+      CCACHE_NOHASHDIR: "true"
+      CCACHE_MAXSIZE: "2G"
+      CCACHE_HARDLINK: "true"
+      KERNEL_DEFCONFIG: "oneplus7_defconfig"  # Set your defconfig file name here
+      CROSS_COMPILE: "aarch64-linux-android-"  # Adjust cross-compile prefix if needed
+
+    steps:
       CCACHE_COMPILERCHECK: "%compiler% -dumpmachine; %compiler% -dumpversion"
       CCACHE_NOHASHDIR: "true"
       CCACHE_MAXSIZE: "2G"
@@ -97,9 +105,17 @@ jobs:
         run: |
           export PATH=$PWD/clang/bin:$PWD/aarch64/bin:$PATH
           export ARCH=arm64 SUBARCH=arm64 LD=ld.lld
-          export BRAND_SHOW_FLAG=oneplus TARGET_PRODUCT=msmnile
+          export CROSS_COMPILE=${{ env.CROSS_COMPILE }}
+          export O=
 
       - name: Build defconfig
+        run: |
+          cd kernel
+          # Generate .config from the defconfig
+          make $KERNEL_DEFCONFIG CC="ccache clang"
+          ls -l .config
+
+      - name: Compile kernel
         run: |
           cd kernel
           make $KERNEL_CMDLINE CC="ccache clang" $KERNEL_DEFCONFIG
