@@ -1,6 +1,6 @@
 name: Build OnePlus-Sm8150-Kernel-LOS21
 on:
-  workflow_dispatch:
+#  workflow_dispatch:
 #  schedule:
       # Run once a week on Sunday at midnight. See http://crontab.guru
 #      - cron: '0 21 * * *'
@@ -100,8 +100,8 @@ jobs:
       with:
         files: |
           OP7-LOS21.zip
-        name: OnePlus7_kernelsu
-        tag_name: test
+        name: OnePlus7_kernelsu-v${{ github.run_number }}  # Include version in release name
+        tag_name: v${{ github.run_number }}  # Dynamic version tag based on run number
         body: |
           Device: Oneplus 7/Oneplus 7Pro/Oneplus 7T/Oneplus 7TPro
           Target: LOS21
