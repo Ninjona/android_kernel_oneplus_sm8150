@@ -1,14 +1,15 @@
 name: Build OnePlus-Sm8150-Kernel-LOS21
 on:
   workflow_dispatch:
- # schedule:
-  #  - cron: '0 0 * * *'  # Daily at midnight UTC; adjust as needed
+  #schedule:
+ #   - cron: '0 0 * * *'  # Daily at midnight UTC; adjust as needed
   push:
     branches:
       - oneplus/LOS_SM8150_14.0
   pull_request:
     branches:
       - oneplus/LOS_SM8150_14.0
+
 jobs:
   build:
     runs-on: ubuntu-22.04
@@ -20,9 +21,12 @@ jobs:
       CCACHE_MAXSIZE: "2G"
       CCACHE_HARDLINK: "true"
       CLANG_COMMIT: "<CLANG_COMMIT_HASH>"  # Replace with the specific commit SHA or tag to lock Clang version
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
 
       - name: Cache ccache
         uses: actions/cache@v3
@@ -54,14 +58,27 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi clang-14 binutils make python3 libssl-dev xz-utils mkbootimg cpio device-tree-compiler git git-lfs
+          sudo apt-get install -y \
+            gcc-aarch64-linux-gnu \
+            gcc-arm-linux-gnueabi \
+            clang-14 \
+            binutils \
+            make \
+            python3 \
+            libssl-dev \
+            xz-utils \
+            mkbootimg \
+            cpio \
+            device-tree-compiler \
+            git \
+            git-lfs
 
       - name: Download AArch64 cross-compiler
         if: steps.cache-aarch64.outputs.cache-hit != 'true'
         run: |
-          git clone https://github.com/LineageOS/android_prebuil...linux-x86_aarch64_aarch64-linux-android-4.9 aarch64 --depth=1
+          git clone https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9.git aarch64 --depth=1
           cd aarch64
-          echo $(git rev-parse HEAD) > version.txt
+          git rev-parse HEAD > version.txt
 
       - name: Download Proton Clang
         if: steps.cache-clang.outputs.cache-hit != 'true'
@@ -77,7 +94,9 @@ jobs:
       - name: Checkout kernel source
         run: |
           rm -rf kernel
-          git clone --recurse-submodules https://github.com/LineageOS/android_kernel_oneplus_sm8150.git -b oneplus/LOS_SM8150_14.0 --depth=1 kernel
+          git clone --recurse-submodules \
+            https://github.com/LineageOS/android_kernel_oneplus_sm8150.git \
+            -b oneplus/LOS_SM8150_14.0 --depth=1 kernel
 
       - name: Configure build environment
         run: |
