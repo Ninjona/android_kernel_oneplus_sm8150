@@ -1,8 +1,8 @@
 name: Build OnePlus-Sm8150-Kernel-LOS21
 on:
   workflow_dispatch:
-  #schedule:
- #   - cron: '0 0 * * *'  # Daily at midnight UTC; adjust as needed
+ # schedule:
+  #  - cron: '0 0 * * *'  # Daily at midnight UTC; adjust as needed
   push:
     branches:
       - oneplus/LOS_SM8150_14.0
@@ -20,7 +20,6 @@ jobs:
       CCACHE_NOHASHDIR: "true"
       CCACHE_MAXSIZE: "2G"
       CCACHE_HARDLINK: "true"
-      CLANG_COMMIT: "<CLANG_COMMIT_HASH>"  # Replace with the specific commit SHA or tag to lock Clang version
 
     steps:
       - name: Checkout repository
@@ -48,7 +47,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: clang/
-          key: ${{ runner.os }}-clang-${{ env.CLANG_COMMIT }}
+          key: ${{ runner.os }}-clang-ZenMaxBuilder
           restore-keys: |
             ${{ runner.os }}-clang-
 
@@ -80,13 +79,10 @@ jobs:
           cd aarch64
           git rev-parse HEAD > version.txt
 
-      - name: Download Proton Clang
+      - name: Download Proton Clang (ZenMaxBuilder)
         if: steps.cache-clang.outputs.cache-hit != 'true'
         run: |
           git clone https://github.com/grm34/proton-clang -b ZenMaxBuilder clang --depth=1
-          cd clang
-          git checkout $CLANG_COMMIT
-          echo $CLANG_COMMIT > commit.txt
 
       - name: Remove AnyKernel3 git metadata
         run: rm -rf AnyKernel3/.git
@@ -94,9 +90,10 @@ jobs:
       - name: Checkout kernel source
         run: |
           rm -rf kernel
-          git clone --recurse-submodules \
-            https://github.com/LineageOS/android_kernel_oneplus_sm8150.git \
+          git clone --no-checkout https://github.com/LineageOS/android_kernel_oneplus_sm8150.git \
             -b oneplus/LOS_SM8150_14.0 --depth=1 kernel
+          cd kernel
+          git checkout --recurse-submodules HEAD
 
       - name: Configure build environment
         run: |
@@ -126,7 +123,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ github.run_number }}
-          name: OnePlus7_kernelsu
+          name: OnePlus7_LOS21
           files: OP7-LOS21.zip
           body: |
             Device: OnePlus 7/7Pro/7T/7TPro
