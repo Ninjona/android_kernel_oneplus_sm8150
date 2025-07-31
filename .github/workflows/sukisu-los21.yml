@@ -77,6 +77,11 @@ jobs:
       run: |
         rm -rf kernel
         git clone https://github.com/Ninjona/android_kernel_oneplus_sm8150 -b oneplus/LOS_SM8150_14.0 --depth=1 kernel
+    - name: Integrate SukiSU-Ultra patches
+      run: |
+       cd kernel
+       curl -LSs https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh \
+       | bash -s nongki
 
     - name: Setup LOS 21
       run: |
