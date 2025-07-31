@@ -24,7 +24,8 @@ jobs:
     - name: Set up ccache
       uses: hendrikmuhs/ccache-action@v1.2
 
-    - name: Cache AArch64 prebuilt toolchain
+    - id: cache-aarch64
+      name: Cache AArch64 prebuilt toolchain
       uses: actions/cache@v3
       with:
         path: aarch64/
@@ -32,7 +33,8 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-aarch64-prebuilt-
 
-    - name: Cache Clang toolchain
+    - id: cache-clang
+      name: Cache Clang toolchain
       uses: actions/cache@v3
       with:
         path: clang/
@@ -61,13 +63,14 @@ jobs:
     - name: Clone AArch64 prebuilt toolchain
       if: steps.cache-aarch64.outputs.cache-hit != 'true'
       run: |
+        rm -rf aarch64
         git clone https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9.git aarch64 --depth=1
-        cd aarch64
-        git rev-parse HEAD > version.txt
+        cd aarch64 && git rev-parse HEAD > version.txt
 
     - name: Clone Proton Clang
       if: steps.cache-clang.outputs.cache-hit != 'true'
       run: |
+        rm -rf clang
         git clone https://github.com/grm34/proton-clang -b ZenMaxBuilder clang --depth=1
 
     - name: Checkout Android 14 kernel source
