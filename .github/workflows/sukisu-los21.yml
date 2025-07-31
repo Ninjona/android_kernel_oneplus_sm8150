@@ -1,7 +1,7 @@
 name: Build OnePlus-Sm8150-Kernel-LOS21
 on:
   workflow_dispatch:
-  #schedule:
+ # schedule:
   #  - cron: '0 0 * * *'  # Daily at midnight UTC; adjust as needed
   push:
     branches:
@@ -23,8 +23,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
-        with:
-          submodules: recursive
 
       - name: Cache ccache
         uses: actions/cache@v3
