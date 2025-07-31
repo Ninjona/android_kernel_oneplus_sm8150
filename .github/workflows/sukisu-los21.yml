@@ -22,6 +22,7 @@ jobs:
       CCACHE_HARDLINK: "true"
       KERNEL_DEFCONFIG: "oneplus7_defconfig"  # Set your defconfig file name here
       CROSS_COMPILE: "aarch64-linux-android-"  # Adjust cross-compile prefix if needed
+      CLANG_TRIPLE: "aarch64-linux-android"    # Required by the Clang wrapper
 
     steps:
       - name: Checkout repository
@@ -91,17 +92,19 @@ jobs:
           export PATH=$PWD/clang/bin:$PWD/aarch64/bin:$PATH
           export ARCH=arm64 SUBARCH=arm64 LD=ld.lld
           export CROSS_COMPILE=${{ env.CROSS_COMPILE }}
+          export CLANG_TRIPLE=${{ env.CLANG_TRIPLE }}
 
       - name: Generate defconfig
         run: |
           cd kernel
-          make $KERNEL_DEFCONFIG CC="ccache clang"
+          # Generate .config using defconfig and Clang triple
+          make $KERNEL_DEFCONFIG CC="ccache clang --target=$CLANG_TRIPLE"
           ls -l .config
 
       - name: Compile kernel
         run: |
           cd kernel
-          make CC="ccache clang" -j$(nproc)
+          make CC="ccache clang --target=$CLANG_TRIPLE" -j$(nproc)
 
       - name: Copy Image to AnyKernel3
         run: |
