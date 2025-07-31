@@ -24,12 +24,6 @@ jobs:
       CROSS_COMPILE: "aarch64-linux-android-"  # Adjust cross-compile prefix if needed
 
     steps:
-      CCACHE_COMPILERCHECK: "%compiler% -dumpmachine; %compiler% -dumpversion"
-      CCACHE_NOHASHDIR: "true"
-      CCACHE_MAXSIZE: "2G"
-      CCACHE_HARDLINK: "true"
-
-    steps:
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
@@ -69,23 +63,14 @@ jobs:
             gcc-aarch64-linux-gnu \
             gcc-arm-linux-gnueabi \
             clang-14 \
-            binutils \
-            make \
-            python3 \
-            libssl-dev \
-            xz-utils \
-            mkbootimg \
-            cpio \
-            device-tree-compiler \
-            git \
-            git-lfs
+            binutils make python3 libssl-dev xz-utils \
+            mkbootimg cpio device-tree-compiler git git-lfs
 
       - name: Download AArch64 cross-compiler
         if: steps.cache-aarch64.outputs.cache-hit != 'true'
         run: |
           git clone https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9.git aarch64 --depth=1
-          cd aarch64
-          git rev-parse HEAD > version.txt
+          cd aarch64 && git rev-parse HEAD > version.txt
 
       - name: Download Proton Clang (ZenMaxBuilder)
         if: steps.cache-clang.outputs.cache-hit != 'true'
@@ -106,27 +91,21 @@ jobs:
           export PATH=$PWD/clang/bin:$PWD/aarch64/bin:$PATH
           export ARCH=arm64 SUBARCH=arm64 LD=ld.lld
           export CROSS_COMPILE=${{ env.CROSS_COMPILE }}
-          export O=
 
-      - name: Build defconfig
+      - name: Generate defconfig
         run: |
           cd kernel
-          # Generate .config from the defconfig
           make $KERNEL_DEFCONFIG CC="ccache clang"
           ls -l .config
 
       - name: Compile kernel
         run: |
           cd kernel
-          make $KERNEL_CMDLINE CC="ccache clang" $KERNEL_DEFCONFIG
-
-      - name: Compile kernel
-        run: |
-          cd kernel
-          make $KERNEL_CMDLINE CC="ccache clang" -j$(nproc)
+          make CC="ccache clang" -j$(nproc)
 
       - name: Copy Image to AnyKernel3
-        run: cp kernel/out/arch/arm64/boot/Image AnyKernel3
+        run: |
+          cp kernel/out/arch/arm64/boot/Image AnyKernel3
 
       - name: Package AnyKernel3 zip
         run: |
