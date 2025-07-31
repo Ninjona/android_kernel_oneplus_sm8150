@@ -107,7 +107,7 @@ jobs:
       uses: softprops/action-gh-release@v2
       with:
         files: |
-          OP7-LOS21.zip
+          AnyKernel3/OP7-LOS21.zip
         name: OnePlus7_SukiSU-v${{ github.run_number }}  # Include version in release name
         tag_name: v${{ github.run_number }}  # Dynamic version tag based on run number
         body: |
