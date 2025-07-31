@@ -1,15 +1,15 @@
 name: Build OnePlus-Sm8150-Kernel-LOS21
 on:
-  workflow_dispatch:
-  schedule:
-    - cron: '0 0 * * *'  # Daily at midnight UTC; adjust as needed
+#  workflow_dispatch:
+#  schedule:
+      # Run once a week on Sunday at midnight. See http://crontab.guru
+#      - cron: '0 21 * * *'
   push:
     branches:
       - oneplus/LOS_SM8150_14.0
   pull_request:
-    branches:
+      branches:
       - oneplus/LOS_SM8150_14.0
-
 jobs:
   build:
     runs-on: ubuntu-22.04
@@ -20,112 +20,90 @@ jobs:
       CCACHE_NOHASHDIR: "true"
       CCACHE_MAXSIZE: "2G"
       CCACHE_HARDLINK: "true"
-      KERNEL_DEFCONFIG: "oneplus7_defconfig"  # Set your defconfig file name here
-      CROSS_COMPILE: "aarch64-linux-android-"  # Adjust cross-compile prefix if needed
-      CLANG_TRIPLE: "aarch64-linux-android"    # Required by the Clang wrapper
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 1
+    - name: Set up ccache
+      uses: hendrikmuhs/ccache-action@v1.2
 
-      - name: Cache ccache
-        uses: actions/cache@v3
-        with:
-          path: ~/.ccache
-          key: ${{ runner.os }}-ccache-${{ hashFiles('kernel/.config') }}
-          restore-keys: |
-            ${{ runner.os }}-ccache-
+    - name: Cache AArch64 prebuilt toolchain
+      uses: actions/cache@v3
+      with:
+        path: aarch64/
+        key: ${{ runner.os }}-aarch64-prebuilt-${{ hashFiles('aarch64/version.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-aarch64-prebuilt-
 
-      - name: Cache AArch64 toolchain
-        uses: actions/cache@v3
-        with:
-          path: aarch64/
-          key: ${{ runner.os }}-aarch64-${{ hashFiles('aarch64/version.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-aarch64-
+    - name: Cache Clang toolchain
+      uses: actions/cache@v3
+      with:
+        path: clang/
+        key: ${{ runner.os }}-clang-ZenMaxBuilder
+        restore-keys: |
+          ${{ runner.os }}-clang-
 
-      - name: Cache Clang toolchain
-        uses: actions/cache@v3
-        with:
-          path: clang/
-          key: ${{ runner.os }}-clang-ZenMaxBuilder
-          restore-keys: |
-            ${{ runner.os }}-clang-
+    - name: Remove unnecessary files
+      run: |
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
 
-      - name: Set up ccache
-        uses: hendrikmuhs/ccache-action@v1.2
+    - name: Install dependencies & AnyKernel3
+      run: |
+        sudo apt-get update -y
+        sudo apt install -y \
+          gcc-aarch64-linux-gnu \
+          gcc-arm-linux-gnueabi \
+          clang-14 \
+          binutils make python3 libssl-dev build-essential bc bison flex unzip ca-certificates xz-utils mkbootimg cpio device-tree-compiler git git-lfs
+        git clone https://github.com/snowwolf725/AnyKernel3 -b oneplus7 --depth=1
+        rm -rf AnyKernel3/.git
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y \
-            gcc-aarch64-linux-gnu \
-            gcc-arm-linux-gnueabi \
-            clang-14 \
-            binutils make python3 libssl-dev xz-utils \
-            mkbootimg cpio device-tree-compiler git git-lfs
+    - name: Clone AArch64 prebuilt toolchain
+      if: steps.cache-aarch64.outputs.cache-hit != 'true'
+      run: |
+        git clone https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9.git aarch64 --depth=1
+        cd aarch64
+        git rev-parse HEAD > version.txt
 
-      - name: Download AArch64 cross-compiler
-        if: steps.cache-aarch64.outputs.cache-hit != 'true'
-        run: |
-          git clone https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9.git aarch64 --depth=1
-          cd aarch64 && git rev-parse HEAD > version.txt
+    - name: Clone Proton Clang
+      if: steps.cache-clang.outputs.cache-hit != 'true'
+      run: |
+        git clone https://github.com/grm34/proton-clang -b ZenMaxBuilder clang --depth=1
 
-      - name: Download Proton Clang (ZenMaxBuilder)
-        if: steps.cache-clang.outputs.cache-hit != 'true'
-        run: |
-          git clone https://github.com/grm34/proton-clang -b ZenMaxBuilder clang --depth=1
+    - name: Checkout Android 14 kernel source
+      run: |
+        rm -rf kernel
+        git clone --recurse-submodules https://github.com/snowwolf725/android_kernel_oneplus_sm8150 -b oneplus/LOS_SM8150_14.0 --depth=1 kernel
 
-      - name: Remove AnyKernel3 git metadata
-        run: rm -rf AnyKernel3/.git
+    - name: Setup LOS 21
+      run: |
+        export KERNEL_DEFCONFIG="lineage_sm8150_defconfig"
+        export KERNEL_CMDLINE="ARCH=arm64 CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-androidkernel- CROSS_COMPILE_ARM32=arm-linux-gnueabi- LLVM=1 LLVM_IAS=1 CONFIG_BUILD_ARM64_DT_OVERLAY=n O=out"
+        export PATH=$(pwd)/clang/bin/:$(pwd)/aarch64/bin/:$PATH
+        export ARCH=arm64
+        export SUBARCH=arm64
+        export LD=ld.lld
+        export BRAND_SHOW_FLAG=oneplus
+        export TARGET_PRODUCT=msmnile
+        cd kernel
+        make $KERNEL_CMDLINE CC="ccache clang" $KERNEL_DEFCONFIG
+        make $KERNEL_CMDLINE CC="ccache clang" -j$(nproc --all)
+        cp out/arch/arm64/boot/Image ./AnyKernel3
 
-      - name: Checkout kernel source
-        run: |
-          rm -rf kernel
-          git clone --recurse-submodules https://github.com/snowwolf725/android_kernel_oneplus_sm8150 \
-            -b oneplus/LOS_SM8150_14.0 --depth=1 kernel
+    - name: Create AK3 zip for Android 14
+      run: |
+        cd AnyKernel3
+        zip -r ./OP7-LOS21.zip *
 
-      - name: Configure build environment
-        run: |
-          export PATH=$PWD/clang/bin:$PWD/aarch64/bin:$PATH
-          export ARCH=arm64 SUBARCH=arm64 LD=ld.lld
-          export CROSS_COMPILE=${{ env.CROSS_COMPILE }}
-          export CLANG_TRIPLE=${{ env.CLANG_TRIPLE }}
-
-      - name: Generate defconfig
-        run: |
-          cd kernel
-          # Generate .config using defconfig
-          make $KERNEL_DEFCONFIG CC="ccache clang"
-          ls -l .config
-
-      - name: Compile kernel
-        run: |
-          cd kernel
-          make CC="ccache clang" -j$(nproc)
-        run: |
-          cd kernel
-          make CC="ccache clang --target=$CLANG_TRIPLE" -j$(nproc)
-
-      - name: Copy Image to AnyKernel3
-        run: |
-          cp kernel/out/arch/arm64/boot/Image AnyKernel3
-
-      - name: Package AnyKernel3 zip
-        run: |
-          cd AnyKernel3
-          zip -r ../OP7-LOS21.zip *
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ github.run_number }}
-          name: OnePlus7_LOS21
-          files: OP7-LOS21.zip
-          body: |
-            Device: OnePlus 7/7Pro/7T/7TPro
-            Target: LOS21
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Upload to Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          OP7-LOS21.zip
+        name: OnePlus7_kernelsu
+        tag_name: test
+        body: |
+          Device: Oneplus 7/Oneplus 7Pro/Oneplus 7T/Oneplus 7TPro
+          Target: LOS21
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
