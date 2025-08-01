@@ -112,18 +112,24 @@ jobs:
           cd ..
     
           # 5. Apply the core SUSFS patch + copy helpers
-          patch -p1 < patches/susfs4ksu/kernel_patches/50_add_susfs_in_kernel-${KERNEL_VERSION%.*}.patch || true
-          cp -r patches/susfs4ksu/kernel_patches/fs/* fs/
-          cp -r patches/susfs4ksu/kernel_patches/include/linux/* include/linux/
+          patch -p1 < patches/susfs4ksu/kernel_patches/50_add_susfs_in_kernel-4.14.patch || true
+          cp -r patches/susfs4ksu/kernel_patches/common/include/linux/* include/linux/ 2>/dev/null || :
+          cp -r patches/susfs4ksu/kernel_patches/common/fs/* fs/ 2>/dev/null || :
     
           # 6. (opt) ZRAM/LZ4K + LZ4KD support
           if [ "$ZRAM" = "true" ]; then
-            cp patches/SukiSU_patch/other/zram/lz4k/include/linux/* include/linux/
-            cp patches/SukiSU_patch/other/zram/lz4k/lib/*           lib/
-            cp patches/SukiSU_patch/other/zram/lz4k/crypto/*        crypto/
+            cp -r patches/SukiSU_patch/other/zram/lz4k/include/linux/* include/linux/
+            cp -r patches/SukiSU_patch/other/zram/lz4k/lib/* lib/
+            cp -r patches/SukiSU_patch/other/zram/lz4k/crypto/* crypto/
             patch -p1 -F3 < patches/SukiSU_patch/other/zram/zram_patch/${KERNEL_VERSION}/lz4kd.patch || true
           fi
     
+          patch -p1 -F3 < patches/SukiSU_patch/69_hide_stuff.patch
+    
+          if [ "$VFS" = "true" ]; then
+            patch -p1 -F3 < patches/SukiSU_patch/hooks/syscall_hooks.patch
+          fi
+          
           # 7. Hide-stuff patch
           patch -p1 -F3 < patches/SukiSU_patch/69_hide_stuff.patch
     
@@ -132,6 +138,13 @@ jobs:
             patch -p1 -F3 < patches/SukiSU_patch/hooks/syscall_hooks.patch
           fi
     
+          # CRITICAL FIX: Ensure SUSFS headers are properly included in core_hook.c
+          if [ -f "drivers/kernelsu/core_hook.c" ]; then
+            if ! grep -q "susfs.h" drivers/kernelsu/core_hook.c; then
+              sed -i '1i #include <linux/susfs.h>' drivers/kernelsu/core_hook.c
+            fi
+          fi
+
           # 9. Append KSU/SUSFS flags to your defconfig
           DEFCONFIG=arch/arm64/configs/lineage_sm8150_defconfig
           echo "CONFIG_KSU=y"                      >> "$DEFCONFIG"
@@ -143,6 +156,7 @@ jobs:
             echo "CONFIG_KSU_SUSFS_SUS_SU=y"      >> "$DEFCONFIG"
           else
             echo "CONFIG_KSU_SUSFS_SUS_SU=n"      >> "$DEFCONFIG"
+
             echo "CONFIG_KSU_MANUAL_HOOK=y"       >> "$DEFCONFIG"
             echo "CONFIG_KSU_SUSFS=y"             >> "$DEFCONFIG"
             echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y"           >> "$DEFCONFIG"
