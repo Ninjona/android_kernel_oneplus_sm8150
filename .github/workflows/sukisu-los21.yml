@@ -87,34 +87,80 @@ jobs:
       - name: Integrate SukiSU‑Ultra patches
         run: |
           cd kernel
-          # 2. Replace #ifdef CONFIG_KPROBES
-          find . -type f -exec sed -i 's/^#ifdef CONFIG_KPROBES/#if defined(CONFIG_KPROBES) \&\& 0/' {} +
       
-          cd $KERNEL_ROOT
-      
-          # 3. Copy and apply patches
-          cp ./kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch $KERNEL_ROOT/KernelSU/
-          cp ./kernel_patches/50_add_susfs_in_kernel-*.patch $KERNEL_ROOT/
-          cp ./kernel_patches/fs/* $KERNEL_ROOT/fs/
-          cp ./kernel_patches/include/linux/* $KERNEL_ROOT/include/linux/
-      
-          cd $KERNEL_ROOT/KernelSU
-          patch -p1 < 10_enable_susfs_for_ksu.patch
-      
-          cd $KERNEL_ROOT
-          patch -p1 < 50_add_susfs_in_kernel-*.patch || echo "Some hunks FAILED, please check manually!"
           # 1. Fetch & install KernelSU
           curl -SLs https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh \
             | bash -s susfs-main
-    
+      
           # 2. Compute & export a version number
           pushd KernelSU
             REV_COUNT=$(git rev-list --count main)
           popd
           KSU_VERSION=$((REV_COUNT + 10606))
           echo "KSU_VERSION=$KSU_VERSION" >> $GITHUB_ENV
-    
-
+      
+          # --- Additional steps for non-GKI integration ---
+          
+          # Revert specific commit in KernelSU
+          pushd KernelSU
+            if git show 898e9d4f8ca9b2f46b0c6b36b80a872b5b88d899 &>/dev/null; then
+              git revert --no-commit 898e9d4f8ca9b2f46b0c6b36b80a872b5b88d899
+            else
+              echo "Commit 898e9d4f8ca9b2f46b0c6b36b80a872b5b88d899 not found; skipping revert"
+            fi
+          popd
+      
+          # Disable kprobes hooks
+          find KernelSU -type f -exec sed -i 's/#ifdef CONFIG_KPROBES/#if defined(CONFIG_KPROBES) \&\& 0/g' {} +
+          find KernelSU -type f -exec sed -i 's/#if defined(CONFIG_KPROBES)/#if defined(CONFIG_KPROBES) \&\& 0/g' {} +
+      
+          # Get SukiSU-Ultra patches
+          git clone --depth=1 --branch=main https://github.com/SukiSU-Ultra/SukiSU-Ultra.git /tmp/SukiSU-Ultra
+      
+          # Copy patches
+          cp /tmp/SukiSU-Ultra/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./KernelSU/
+          
+          # Get kernel version (format: X.Y.Z)
+          KERNEL_VERSION=$(grep -E '^VERSION|^PATCHLEVEL|^SUBLEVEL' Makefile | awk '{print $3}' | tr '\n' '.' | sed 's/\.$//')
+          if [ -z "$KERNEL_VERSION" ]; then
+            echo "ERROR: Failed to determine kernel version!"
+            exit 1
+          fi
+      
+          # Copy kernel version-specific patch
+          PATCH_FILE="/tmp/SukiSU-Ultra/kernel_patches/50_add_susfs_in_kernel-${KERNEL_VERSION}.patch"
+          if [ -f "$PATCH_FILE" ]; then
+            cp "$PATCH_FILE" ./50_add_susfs_in_kernel.patch
+          else
+            # Try finding patch for base version (X.Y)
+            BASE_VER=$(echo "$KERNEL_VERSION" | cut -d. -f1-2)
+            PATCH_FILE=$(find /tmp/SukiSU-Ultra/kernel_patches -name "50_add_susfs_in_kernel-${BASE_VER}*.patch" | head -n1)
+            if [ -n "$PATCH_FILE" ]; then
+              cp "$PATCH_FILE" ./50_add_susfs_in_kernel.patch
+            else
+              echo "ERROR: No matching kernel patch found for $KERNEL_VERSION!"
+              exit 1
+            fi
+          fi
+      
+          # Copy filesystem and header patches
+          cp -r /tmp/SukiSU-Ultra/kernel_patches/fs/* ./fs/
+          cp -r /tmp/SukiSU-Ultra/kernel_patches/include/linux/* ./include/linux/
+      
+          # Apply patches
+          pushd KernelSU
+            patch -p1 < 10_enable_susfs_for_ksu.patch
+          popd
+          patch -p1 < 50_add_susfs_in_kernel.patch
+      
+          # Cleanup
+          rm -rf /tmp/SukiSU-Ultra
+      
+          # Final configuration reminder
+          echo "SUCCESS: Patches applied! Remember to:"
+          echo "1. Enable CONFIG_KSU and CONFIG_KSU_SUSFS in kernel config"
+          echo "2. Add manager APK hashes in KernelSU/kernel/apk_sign.c if needed"
+          echo "3. Enable KSU_SUSFS_HAS_MAGIC_MOUNT for Magisk support"
 
 
       - name: Setup LOS 21
