@@ -24,7 +24,7 @@ jobs:
 
     env:
       ANDROID_VERSION: android14
-      KERNEL_VERSION: 4.14.355
+      KERNEL_VERSION: 4.14
       ZRAM: ${{ github.event.inputs.ZRAM }}
       VFS: ${{ github.event.inputs.VFS }}
       CCACHE_COMPILERCHECK: '%compiler% -dumpmachine; %compiler% -dumpversion'
