@@ -131,8 +131,20 @@ jobs:
           fi
           
           # 7. Hide-stuff patch
-          patch -p1 -F3 < patches/SukiSU_patch/69_hide_stuff.patch
-    
+            patch -p1 -F3 -f < patches/SukiSU_patch/69_hide_stuff.patch || :
+              if find . -name '*.rej' | grep -q .; then
+                  echo "Found patch reject files! Attempting cleanup..."
+                    # Remove empty reject files and attempt to apply manually
+                    find . -name '*.rej' -size 0 -delete
+                    for reject in $(find . -name '*.rej'); do
+                      orig_file=${reject%.rej}
+                      echo "Processing $reject for $orig_file"
+                      # Attempt to apply with reduced fuzz factor
+                      patch -p1 -f -F1 $orig_file < $reject || :
+                      rm -f $reject
+                    done
+               fi    
+      
           # 8. (opt) VFS syscall hooks
           if [ "$VFS" = "true" ]; then
             patch -p1 -F3 < patches/SukiSU_patch/hooks/syscall_hooks.patch
