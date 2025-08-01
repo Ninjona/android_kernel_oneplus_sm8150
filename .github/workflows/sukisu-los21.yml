@@ -144,7 +144,8 @@ jobs:
           DEFCONFIG=arch/arm64/configs/lineage_sm8150_defconfig
           echo "CONFIG_KSU=y"                      >> "$DEFCONFIG"
           echo "CONFIG_KPM=y"                      >> "$DEFCONFIG"
-    
+
+
           if [ "$VFS" = "false" ]; then
             echo "CONFIG_KPROBES=y"               >> "$DEFCONFIG"
             echo "CONFIG_KSU_SUSFS_SUS_SU=y"      >> "$DEFCONFIG"
@@ -166,22 +167,21 @@ jobs:
             echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y"   >> "$DEFCONFIG"
             echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" >> "$DEFCONFIG"
             echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y"            >> "$DEFCONFIG"
+          fi  
+          
+          # 10. ZRAM built-in & crypto backends
+          if [ "$ZRAM" = "true" ]; then
+            echo "CONFIG_ZSMALLOC=y"               >> "$DEFCONFIG"
+            echo "CONFIG_ZRAM=y"                   >> "$DEFCONFIG"
+            echo "CONFIG_CRYPTO_LZO=y"             >> "$DEFCONFIG"
+            echo "CONFIG_ZRAM_DEF_COMP_LZ4KD=y"    >> "$DEFCONFIG"
+            echo "CONFIG_MODULE_SIG=n"             >> "$DEFCONFIG"
+            echo "CONFIG_CRYPTO_LZ4HC=y"           >> "$DEFCONFIG"
+            echo "CONFIG_CRYPTO_LZ4K=y"            >> "$DEFCONFIG"
+            echo "CONFIG_CRYPTO_LZ4KD=y"           >> "$DEFCONFIG"
+            echo "CONFIG_CRYPTO_842=y"             >> "$DEFCONFIG"
+            echo "CONFIG_ZRAM_WRITEBACK=y"         >> "$DEFCONFIG"
           fi
-
-      # 10. ZRAM built-in & crypto backends
-      if [ "$ZRAM" = "true" ]; then
-        echo "CONFIG_ZSMALLOC=y"               >> "$DEFCONFIG"
-        echo "CONFIG_ZRAM=y"                   >> "$DEFCONFIG"
-        echo "CONFIG_CRYPTO_LZO=y"             >> "$DEFCONFIG"
-        echo "CONFIG_ZRAM_DEF_COMP_LZ4KD=y"    >> "$DEFCONFIG"
-        echo "CONFIG_MODULE_SIG=n"             >> "$DEFCONFIG"
-        echo "CONFIG_CRYPTO_LZ4HC=y"           >> "$DEFCONFIG"
-        echo "CONFIG_CRYPTO_LZ4K=y"            >> "$DEFCONFIG"
-        echo "CONFIG_CRYPTO_LZ4KD=y"           >> "$DEFCONFIG"
-        echo "CONFIG_CRYPTO_842=y"             >> "$DEFCONFIG"
-        echo "CONFIG_ZRAM_WRITEBACK=y"         >> "$DEFCONFIG"
-      fi
-
 
       - name: Setup LOS 21
         run: |
