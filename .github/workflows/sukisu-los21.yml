@@ -91,35 +91,39 @@ jobs:
           git clone https://github.com/Ninjona/android_kernel_oneplus_sm8150 \
             -b oneplus/LOS_SM8150_14.0 --depth=1 kernel
 
-      - name: Integrate SukiSU-Ultra patches
+
+      - name: Integrate SukiSU‑Ultra patches
         run: |
           cd kernel
-
+    
           # 1. Fetch & install KernelSU
           curl -SLs https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh \
             | bash -s susfs-main
-
+    
           # 2. Compute & export a version number
           pushd KernelSU
             REV_COUNT=$(git rev-list --count main)
           popd
           KSU_VERSION=$((REV_COUNT + 10606))
           echo "KSU_VERSION=$KSU_VERSION" >> $GITHUB_ENV
-
+    
           # 3. Patch the top-level Makefile
           sed -i "s/^DKSU_VERSION=.*/DKSU_VERSION=${KSU_VERSION}/" Makefile
-
-          # 4. Clone needed patch repos
-          mkdir -p patches && cd patches
-          git clone -b gki-${ANDROID_VERSION}-${KERNEL_VERSION} https://gitlab.com/simonpunk/susfs4ksu.git
+    
+          # 4. Clone SUSFS4KSU from its kernel-4.14 branch
+          mkdir -p patches
+          cd patches
+          git clone --single-branch \
+            -b kernel-${KERNEL_VERSION%.*} \
+            https://gitlab.com/simonpunk/susfs4ksu.git susfs4ksu
           git clone https://github.com/ShirkNeko/SukiSU_patch.git
           cd ..
-
+    
           # 5. Apply the core SUSFS patch + copy helpers
-          patch -p1 < patches/susfs4ksu/kernel_patches/50_add_susfs_in_gki-${ANDROID_VERSION}-${KERNEL_VERSION}.patch || true
-          cp patches/susfs4ksu/kernel_patches/fs/* fs/
-          cp patches/susfs4ksu/kernel_patches/include/linux/* include/linux/
-
+          patch -p1 < patches/susfs4ksu/kernel_patches/50_add_susfs_in_kernel-${KERNEL_VERSION%.*}.patch || true
+          cp -r patches/susfs4ksu/kernel_patches/fs/* fs/
+          cp -r patches/susfs4ksu/kernel_patches/include/linux/* include/linux/
+    
           # 6. (opt) ZRAM/LZ4K + LZ4KD support
           if [ "$ZRAM" = "true" ]; then
             cp patches/SukiSU_patch/other/zram/lz4k/include/linux/* include/linux/
@@ -127,20 +131,20 @@ jobs:
             cp patches/SukiSU_patch/other/zram/lz4k/crypto/*        crypto/
             patch -p1 -F3 < patches/SukiSU_patch/other/zram/zram_patch/${KERNEL_VERSION}/lz4kd.patch || true
           fi
-
+    
           # 7. Hide-stuff patch
           patch -p1 -F3 < patches/SukiSU_patch/69_hide_stuff.patch
-
+    
           # 8. (opt) VFS syscall hooks
           if [ "$VFS" = "true" ]; then
             patch -p1 -F3 < patches/SukiSU_patch/hooks/syscall_hooks.patch
           fi
-
+    
           # 9. Append KSU/SUSFS flags to your defconfig
           DEFCONFIG=arch/arm64/configs/lineage_sm8150_defconfig
           echo "CONFIG_KSU=y"                      >> "$DEFCONFIG"
           echo "CONFIG_KPM=y"                      >> "$DEFCONFIG"
-
+    
           if [ "$VFS" = "false" ]; then
             echo "CONFIG_KPROBES=y"               >> "$DEFCONFIG"
             echo "CONFIG_KSU_SUSFS_SUS_SU=y"      >> "$DEFCONFIG"
@@ -164,75 +168,20 @@ jobs:
             echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y"            >> "$DEFCONFIG"
           fi
 
-          # 10. ZRAM built-in & crypto backends
-          if [ "$ZRAM" = "true" ]; then
-            echo "CONFIG_ZSMALLOC=y"               >> "$DEFCONFIG"
-            echo "CONFIG_ZRAM=y"                   >> "$DEFCONFIG"
-            echo "CONFIG_CRYPTO_LZO=y"             >> "$DEFCONFIG"
-            echo "CONFIG_ZRAM_DEF_COMP_LZ4KD=y"    >> "$DEFCONFIG"
-            echo "CONFIG_MODULE_SIG=n"             >> "$DEFCONFIG"
-            echo "CONFIG_CRYPTO_LZ4HC=y"           >> "$DEFCONFIG"
-            echo "CONFIG_CRYPTO_LZ4K=y"            >> "$DEFCONFIG"
-            echo "CONFIG_CRYPTO_LZ4KD=y"           >> "$DEFCONFIG"
-            echo "CONFIG_CRYPTO_842=y"             >> "$DEFCONFIG"
-            echo "CONFIG_ZRAM_WRITEBACK=y"         >> "$DEFCONFIG"
-          fi
+      # 10. ZRAM built-in & crypto backends
+      if [ "$ZRAM" = "true" ]; then
+        echo "CONFIG_ZSMALLOC=y"               >> "$DEFCONFIG"
+        echo "CONFIG_ZRAM=y"                   >> "$DEFCONFIG"
+        echo "CONFIG_CRYPTO_LZO=y"             >> "$DEFCONFIG"
+        echo "CONFIG_ZRAM_DEF_COMP_LZ4KD=y"    >> "$DEFCONFIG"
+        echo "CONFIG_MODULE_SIG=n"             >> "$DEFCONFIG"
+        echo "CONFIG_CRYPTO_LZ4HC=y"           >> "$DEFCONFIG"
+        echo "CONFIG_CRYPTO_LZ4K=y"            >> "$DEFCONFIG"
+        echo "CONFIG_CRYPTO_LZ4KD=y"           >> "$DEFCONFIG"
+        echo "CONFIG_CRYPTO_842=y"             >> "$DEFCONFIG"
+        echo "CONFIG_ZRAM_WRITEBACK=y"         >> "$DEFCONFIG"
+      fi
 
-
-          # 8. Enable KSU/SUSFS flags
-          DEFCONFIG=../kernel_platform/common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU=y"                  >> "$DEFCONFIG"
-          echo "CONFIG_KPM=y"                  >> "$DEFCONFIG"
-
-          if [ "${VFS}" = "false" ]; then
-            echo "CONFIG_KPROBES=y"           >> "$DEFCONFIG"
-            echo "CONFIG_KSU_SUSFS_SUS_SU=y"  >> "$DEFCONFIG"
-          else
-            echo "CONFIG_KSU_SUSFS_SUS_SU=n"  >> "$DEFCONFIG"
-            echo "CONFIG_KSU_MANUAL_HOOK=y"   >> "$DEFCONFIG"
-            echo "CONFIG_KSU_SUSFS=y"         >> "$DEFCONFIG"
-            echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y"               >> "$DEFCONFIG"
-            echo "CONFIG_KSU_SUSFS_SUS_PATH=y"                      >> "$DEFCONFIG"
-            echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y"                     >> "$DEFCONFIG"
-            echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y">> "$DEFCONFIG"
-            echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y"       >> "$DEFCONFIG"
-            echo "CONFIG_KSU_SUSFS_SUS_KSTAT=y"                     >> "$DEFCONFIG"
-            echo "CONFIG_KSU_SUSFS_SUS_OVERLAYFS=n"                 >> "$DEFCONFIG"
-            echo "CONFIG_KSU_SUSFS_TRY_UMOUNT=y"                    >> "$DEFCONFIG"
-            echo "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y" >> "$DEFCONFIG"
-            echo "CONFIG_KSU_SUSFS_SPOOF_UNAME=y"                     >> "$DEFCONFIG"
-            echo "CONFIG_KSU_SUSFS_ENABLE_LOG=y"                     >> "$DEFCONFIG"
-            echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y"         >> "$DEFCONFIG"
-            echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y"    >> "$DEFCONFIG"
-            echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y"                  >> "$DEFCONFIG"
-          fi
-
-          # 9. Remove check_defconfig guard
-          sed -i 's/check_defconfig//' ../kernel_platform/common/build.config.gki
-
-          # 10. ZRAM built-in & crypto tweaks
-          if [ "${ZRAM}" = "true" ]; then
-            if [ "${KERNEL_VERSION}" = "5.10" ]; then
-              echo "CONFIG_ZSMALLOC=y"               >> "$DEFCONFIG"
-              echo "CONFIG_ZRAM=y"                   >> "$DEFCONFIG"
-              echo "CONFIG_CRYPTO_LZO=y"             >> "$DEFCONFIG"
-              echo "CONFIG_ZRAM_DEF_COMP_LZ4KD=y"    >> "$DEFCONFIG"
-              echo "CONFIG_MODULE_SIG=n"             >> "$DEFCONFIG"
-            else
-              sed -i 's/CONFIG_ZSMALLOC=m/CONFIG_ZSMALLOC=y/' "$DEFCONFIG" || true
-              sed -i 's/CONFIG_ZRAM=m/CONFIG_ZRAM=y/'         "$DEFCONFIG" || true
-              echo "CONFIG_ZSMALLOC=y"               >> "$DEFCONFIG"
-              echo "CONFIG_ZRAM=y"                   >> "$DEFCONFIG"
-            fi
-
-            if grep -q "CONFIG_ZSMALLOC=y" "$DEFCONFIG" && grep -q "CONFIG_ZRAM=y" "$DEFCONFIG"; then
-              echo "CONFIG_CRYPTO_LZ4HC=y"         >> "$DEFCONFIG"
-              echo "CONFIG_CRYPTO_LZ4K=y"          >> "$DEFCONFIG"
-              echo "CONFIG_CRYPTO_LZ4KD=y"         >> "$DEFCONFIG"
-              echo "CONFIG_CRYPTO_842=y"           >> "$DEFCONFIG"
-              echo "CONFIG_ZRAM_WRITEBACK=y"       >> "$DEFCONFIG"
-            fi
-          fi
 
       - name: Setup LOS 21
         run: |
