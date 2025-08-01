@@ -87,7 +87,22 @@ jobs:
       - name: Integrate SukiSU‑Ultra patches
         run: |
           cd kernel
-    
+          # 2. Replace #ifdef CONFIG_KPROBES
+          find . -type f -exec sed -i 's/^#ifdef CONFIG_KPROBES/#if defined(CONFIG_KPROBES) \&\& 0/' {} +
+      
+          cd $KERNEL_ROOT
+      
+          # 3. Copy and apply patches
+          cp ./kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch $KERNEL_ROOT/KernelSU/
+          cp ./kernel_patches/50_add_susfs_in_kernel-*.patch $KERNEL_ROOT/
+          cp ./kernel_patches/fs/* $KERNEL_ROOT/fs/
+          cp ./kernel_patches/include/linux/* $KERNEL_ROOT/include/linux/
+      
+          cd $KERNEL_ROOT/KernelSU
+          patch -p1 < 10_enable_susfs_for_ksu.patch
+      
+          cd $KERNEL_ROOT
+          patch -p1 < 50_add_susfs_in_kernel-*.patch || echo "Some hunks FAILED, please check manually!"
           # 1. Fetch & install KernelSU
           curl -SLs https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh \
             | bash -s susfs-main
@@ -99,124 +114,9 @@ jobs:
           KSU_VERSION=$((REV_COUNT + 10606))
           echo "KSU_VERSION=$KSU_VERSION" >> $GITHUB_ENV
     
-          # 3. Patch the top-level Makefile
-          sed -i "s/^DKSU_VERSION=.*/DKSU_VERSION=${KSU_VERSION}/" Makefile
-    
-          # 4. Clone SUSFS4KSU from its kernel-4.14 branch
-          mkdir -p patches
-          cd patches
-          git clone --single-branch \
-            -b kernel-4.14 \
-            https://gitlab.com/simonpunk/susfs4ksu.git susfs4ksu
-          git clone https://github.com/ShirkNeko/SukiSU_patch.git
-          cd ..
-    
-          # 5. Apply the core SUSFS patch + copy helpers
-          patch -p1 < patches/susfs4ksu/kernel_patches/50_add_susfs_in_kernel-4.14.patch || true
-          # CRITICAL FIX: Ensure all SUSFS headers are properly copied
-          # Find all SUSFS headers in the patch directory
-          find patches/susfs4ksu/kernel_patches -name '*.h' -exec cp -v --parents {} . \;
-          
-          # Alternative: Copy entire SUSFS header directories
-          if [ -d "patches/susfs4ksu/kernel_patches/common/include/linux" ]; then
-            cp -r patches/susfs4ksu/kernel_patches/common/include/linux/* include/linux/
-          fi
-          if [ -d "patches/susfs4ksu/kernel_patches/include/linux" ]; then
-            cp -r patches/susfs4ksu/kernel_patches/include/linux/* include/linux/
-          fi
-    
-    
-          # 6. (opt) ZRAM/LZ4K + LZ4KD support
-          if [ "$ZRAM" = "true" ]; then
-            cp -r patches/SukiSU_patch/other/zram/lz4k/include/linux/* include/linux/
-            cp -r patches/SukiSU_patch/other/zram/lz4k/lib/* lib/
-            cp -r patches/SukiSU_patch/other/zram/lz4k/crypto/* crypto/
-            patch -p1 -F3 < patches/SukiSU_patch/other/zram/zram_patch/${KERNEL_VERSION}/lz4kd.patch || true
-          fi
-    
-          patch -p1 -F3 < patches/SukiSU_patch/69_hide_stuff.patch
-    
-          if [ "$VFS" = "true" ]; then
-            patch -p1 -F3 < patches/SukiSU_patch/hooks/syscall_hooks.patch
-          fi
-          
-          # 7. Hide-stuff patch
-            patch -p1 -F3 -f < patches/SukiSU_patch/69_hide_stuff.patch || :
-              if find . -name '*.rej' | grep -q .; then
-                  echo "Found patch reject files! Attempting cleanup..."
-                    # Remove empty reject files and attempt to apply manually
-                    find . -name '*.rej' -size 0 -delete
-                    for reject in $(find . -name '*.rej'); do
-                      orig_file=${reject%.rej}
-                      echo "Processing $reject for $orig_file"
-                      # Attempt to apply with reduced fuzz factor
-                      patch -p1 -f -F1 $orig_file < $reject || :
-                      rm -f $reject
-                    done
-               fi    
-      
-          # 8. (opt) VFS syscall hooks
-          if [ "$VFS" = "true" ]; then
-            patch -p1 -F3 < patches/SukiSU_patch/hooks/syscall_hooks.patch
-          fi
-    
-          # CRITICAL FIX: Ensure SUSFS headers are properly included in core_hook.c
-          if [ -f "drivers/kernelsu/core_hook.c" ]; then
-            if ! grep -q "susfs.h" drivers/kernelsu/core_hook.c; then
-              sed -i '1i #include <linux/susfs.h>' drivers/kernelsu/core_hook.c
-            fi
-          fi
-
-          # 9. Append KSU/SUSFS flags to your defconfig
-          DEFCONFIG=arch/arm64/configs/lineage_sm8150_defconfig
-          echo "CONFIG_KSU=y"                      >> "$DEFCONFIG"
-          echo "CONFIG_KPM=y"                      >> "$DEFCONFIG"
 
 
-          if [ "$VFS" = "false" ]; then
-            echo "CONFIG_KPROBES=y"               >> "$DEFCONFIG"
-            echo "CONFIG_KSU_SUSFS_SUS_SU=y"      >> "$DEFCONFIG"
-          else
-            echo "CONFIG_KSU_SUSFS_SUS_SU=n"      >> "$DEFCONFIG"
 
-            echo "CONFIG_KSU_MANUAL_HOOK=y"       >> "$DEFCONFIG"
-            echo "CONFIG_KSU_SUSFS=y"             >> "$DEFCONFIG"
-            echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y"           >> "$DEFCONFIG"
-            echo "CONFIG_KSU_SUSFS_SUS_PATH=y"                  >> "$DEFCONFIG"
-            echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y"                 >> "$DEFCONFIG"
-            echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y" >> "$DEFCONFIG"
-            echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y"   >> "$DEFCONFIG"
-            echo "CONFIG_KSU_SUSFS_SUS_KSTAT=y"                 >> "$DEFCONFIG"
-            echo "CONFIG_KSU_SUSFS_SUS_OVERLAYFS=n"             >> "$DEFCONFIG"
-            echo "CONFIG_KSU_SUSFS_TRY_UMOUNT=y"                >> "$DEFCONFIG"
-            echo "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y" >> "$DEFCONFIG"
-            echo "CONFIG_KSU_SUSFS_SPOOF_UNAME=y"               >> "$DEFCONFIG"
-            echo "CONFIG_KSU_SUSFS_ENABLE_LOG=y"               >> "$DEFCONFIG"
-            echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y"   >> "$DEFCONFIG"
-            echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" >> "$DEFCONFIG"
-            echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y"            >> "$DEFCONFIG"
-          fi  
-          
-          # 10. ZRAM built-in & crypto backends
-          if [ "$ZRAM" = "true" ]; then
-            echo "CONFIG_ZSMALLOC=y"               >> "$DEFCONFIG"
-            echo "CONFIG_ZRAM=y"                   >> "$DEFCONFIG"
-            echo "CONFIG_CRYPTO_LZO=y"             >> "$DEFCONFIG"
-            echo "CONFIG_ZRAM_DEF_COMP_LZ4KD=y"    >> "$DEFCONFIG"
-            echo "CONFIG_MODULE_SIG=n"             >> "$DEFCONFIG"
-            echo "CONFIG_CRYPTO_LZ4HC=y"           >> "$DEFCONFIG"
-            echo "CONFIG_CRYPTO_LZ4K=y"            >> "$DEFCONFIG"
-            echo "CONFIG_CRYPTO_LZ4KD=y"           >> "$DEFCONFIG"
-            echo "CONFIG_CRYPTO_842=y"             >> "$DEFCONFIG"
-            echo "CONFIG_ZRAM_WRITEBACK=y"         >> "$DEFCONFIG"
-          fi
-          # Verify SUSFS headers exist
-          if [ ! -f "include/linux/susfs_def.h" ]; then
-            echo "ERROR: susfs_def.h still missing after copy attempts!"
-            echo "Searching for susfs headers in patches directory:"
-            find patches/susfs4ksu -name 'susfs*.h'
-            exit 1
-          fi
       - name: Setup LOS 21
         run: |
           export KERNEL_DEFCONFIG="lineage_sm8150_defconfig"
