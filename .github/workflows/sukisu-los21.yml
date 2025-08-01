@@ -93,6 +93,7 @@ jobs:
 
 
   
+         
       - name: Integrate SukiSU‑Ultra patches
         run: |
           cd kernel
@@ -122,10 +123,12 @@ jobs:
     
           # 5. Apply the core SUSFS patch and copy helpers
           patch -p1 < patches/susfs4ksu/kernel_patches/50_add_susfs_in_kernel-${KERNEL_VERSION%.*}.patch || true
-          cp -r patches/susfs4ksu/kernel_patches/fs/*              fs/
-          cp -r patches/susfs4ksu/kernel_patches/include/linux/*   include/linux/
+          # Copy filesystem hooks
+          cp -r patches/susfs4ksu/kernel_patches/common/fs/*              fs/
+          # Copy required SUSFS headers (defines CMD_SUSFS_*)
+          cp -r patches/susfs4ksu/kernel_patches/common/include/linux/*   include/linux/
     
-          # 6. (opt) ZRAM/LZ4K + LZ4KD support
+          # 6. (opt) ZRAM/LZ4K + LZ4KD support (opt) ZRAM/LZ4K + LZ4KD support
           if [ "$ZRAM" = "true" ]; then
             cp patches/SukiSU_patch/other/zram/lz4k/include/linux/* include/linux/
             cp patches/SukiSU_patch/other/zram/lz4k/lib/*           lib/
@@ -182,8 +185,8 @@ jobs:
             echo "CONFIG_CRYPTO_842=y"             >> "$DEFCONFIG"
             echo "CONFIG_ZRAM_WRITEBACK=y"         >> "$DEFCONFIG"
           fi
-
-
+    
+    
 
 
 
