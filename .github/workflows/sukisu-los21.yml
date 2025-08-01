@@ -22,12 +22,11 @@ jobs:
     permissions:
       contents: write
 
-    # fixed Android & Kernel versions:
     env:
       ANDROID_VERSION: android14
       KERNEL_VERSION: 4.14.355
       ZRAM: ${{ github.event.inputs.ZRAM }}
-      VFS:  ${{ github.event.inputs.VFS }}
+      VFS: ${{ github.event.inputs.VFS }}
       CCACHE_COMPILERCHECK: '%compiler% -dumpmachine; %compiler% -dumpversion'
       CCACHE_NOHASHDIR: 'true'
       CCACHE_MAXSIZE: '2G'
@@ -134,81 +133,76 @@ jobs:
             patch -p1 -F3 < lz4kd.patch || true
           fi
 
-          # 6. Hide stuff
+          # 6. Hide-stuff
           cp ../../patches/SukiSU_patch/69_hide_stuff.patch ./
           patch -p1 -F3 < 69_hide_stuff.patch
 
-          # 7. (opt) VFS syscall hooks
+          # 7. (opt) VFS syscall-hooks
           if [ "${VFS}" = "true" ]; then
             cp ../../patches/SukiSU_patch/hooks/syscall_hooks.patch ./
             patch -p1 -F3 < syscall_hooks.patch
           fi
 
-          # 8. Enable KSU/SUSFS flags in defconfig
+          # 8. Enable KSU/SUSFS flags
           DEFCONFIG=../kernel_platform/common/arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU=y"   >> "$DEFCONFIG"
-          echo "CONFIG_KPM=y"   >> "$DEFCONFIG"
+          echo "CONFIG_KSU=y"                  >> "$DEFCONFIG"
+          echo "CONFIG_KPM=y"                  >> "$DEFCONFIG"
 
           if [ "${VFS}" = "false" ]; then
-            echo "CONFIG_KPROBES=y"            >> "$DEFCONFIG"
-            echo "CONFIG_KSU_SUSFS_SUS_SU=y"   >> "$DEFCONFIG"
+            echo "CONFIG_KPROBES=y"           >> "$DEFCONFIG"
+            echo "CONFIG_KSU_SUSFS_SUS_SU=y"  >> "$DEFCONFIG"
           else
-            echo "CONFIG_KSU_SUSFS_SUS_SU=n"   >> "$DEFCONFIG"
-            echo "CONFIG_KSU_MANUAL_HOOK=y"    >> "$DEFCONFIG"
-            cat <<EOF >> "$DEFCONFIG"
-CONFIG_KSU_SUSFS=y
-CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
-CONFIG_KSU_SUSFS_SUS_PATH=y
-CONFIG_KSU_SUSFS_SUS_MOUNT=y
-CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y
-CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y
-CONFIG_KSU_SUSFS_SUS_KSTAT=y
-CONFIG_KSU_SUSFS_SUS_OVERLAYFS=n
-CONFIG_KSU_SUSFS_TRY_UMOUNT=y
-CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y
-CONFIG_KSU_SUSFS_SPOOF_UNAME=y
-CONFIG_KSU_SUSFS_ENABLE_LOG=y
-CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
-CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
-CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
-EOF
+            echo "CONFIG_KSU_SUSFS_SUS_SU=n"  >> "$DEFCONFIG"
+            echo "CONFIG_KSU_MANUAL_HOOK=y"   >> "$DEFCONFIG"
+            echo "CONFIG_KSU_SUSFS=y"         >> "$DEFCONFIG"
+            echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y"               >> "$DEFCONFIG"
+            echo "CONFIG_KSU_SUSFS_SUS_PATH=y"                      >> "$DEFCONFIG"
+            echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y"                     >> "$DEFCONFIG"
+            echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y">> "$DEFCONFIG"
+            echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y"       >> "$DEFCONFIG"
+            echo "CONFIG_KSU_SUSFS_SUS_KSTAT=y"                     >> "$DEFCONFIG"
+            echo "CONFIG_KSU_SUSFS_SUS_OVERLAYFS=n"                 >> "$DEFCONFIG"
+            echo "CONFIG_KSU_SUSFS_TRY_UMOUNT=y"                    >> "$DEFCONFIG"
+            echo "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y" >> "$DEFCONFIG"
+            echo "CONFIG_KSU_SUSFS_SPOOF_UNAME=y"                     >> "$DEFCONFIG"
+            echo "CONFIG_KSU_SUSFS_ENABLE_LOG=y"                     >> "$DEFCONFIG"
+            echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y"         >> "$DEFCONFIG"
+            echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y"    >> "$DEFCONFIG"
+            echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y"                  >> "$DEFCONFIG"
           fi
 
           # 9. Remove check_defconfig guard
           sed -i 's/check_defconfig//' ../kernel_platform/common/build.config.gki
 
-          # 10. Final ZRAM built-in + crypto tweaks
+          # 10. ZRAM built-in & crypto tweaks
           if [ "${ZRAM}" = "true" ]; then
             if [ "${KERNEL_VERSION}" = "5.10" ]; then
-              cat <<EOF >> "$DEFCONFIG"
-CONFIG_ZSMALLOC=y
-CONFIG_ZRAM=y
-CONFIG_CRYPTO_LZO=y
-CONFIG_ZRAM_DEF_COMP_LZ4KD=y
-CONFIG_MODULE_SIG=n
-EOF
+              echo "CONFIG_ZSMALLOC=y"               >> "$DEFCONFIG"
+              echo "CONFIG_ZRAM=y"                   >> "$DEFCONFIG"
+              echo "CONFIG_CRYPTO_LZO=y"             >> "$DEFCONFIG"
+              echo "CONFIG_ZRAM_DEF_COMP_LZ4KD=y"    >> "$DEFCONFIG"
+              echo "CONFIG_MODULE_SIG=n"             >> "$DEFCONFIG"
             else
               sed -i 's/CONFIG_ZSMALLOC=m/CONFIG_ZSMALLOC=y/' "$DEFCONFIG" || true
               sed -i 's/CONFIG_ZRAM=m/CONFIG_ZRAM=y/'         "$DEFCONFIG" || true
-              echo "CONFIG_ZSMALLOC=y" >> "$DEFCONFIG"
-              echo "CONFIG_ZRAM=y"      >> "$DEFCONFIG"
+              echo "CONFIG_ZSMALLOC=y"               >> "$DEFCONFIG"
+              echo "CONFIG_ZRAM=y"                   >> "$DEFCONFIG"
             fi
 
-            grep -q "CONFIG_ZSMALLOC=y" "$DEFCONFIG" && \
-            grep -q "CONFIG_ZRAM=y"      "$DEFCONFIG" && cat <<EOF >> "$DEFCONFIG"
-CONFIG_CRYPTO_LZ4HC=y
-CONFIG_CRYPTO_LZ4K=y
-CONFIG_CRYPTO_LZ4KD=y
-CONFIG_CRYPTO_842=y
-CONFIG_ZRAM_WRITEBACK=y
-EOF
+            if grep -q "CONFIG_ZSMALLOC=y" "$DEFCONFIG" && grep -q "CONFIG_ZRAM=y" "$DEFCONFIG"; then
+              echo "CONFIG_CRYPTO_LZ4HC=y"         >> "$DEFCONFIG"
+              echo "CONFIG_CRYPTO_LZ4K=y"          >> "$DEFCONFIG"
+              echo "CONFIG_CRYPTO_LZ4KD=y"         >> "$DEFCONFIG"
+              echo "CONFIG_CRYPTO_842=y"           >> "$DEFCONFIG"
+              echo "CONFIG_ZRAM_WRITEBACK=y"       >> "$DEFCONFIG"
+            fi
           fi
 
       - name: Setup LOS 21
         run: |
           export KERNEL_DEFCONFIG="lineage_sm8150_defconfig"
           export KERNEL_CMDLINE="ARCH=arm64 CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-androidkernel- CROSS_COMPILE_ARM32=arm-linux-gnueabi- LLVM=1 LLVM_IAS=1 CONFIG_BUILD_ARM64_DT_OVERLAY=n O=out"
-          export PATH=$(pwd)/clang/bin/:$(pwd)/aarch64/bin/:$PATH
+          export PATH=$(pwd)/clang/bin/:$(pwd)/aarch74/bin/:$PATH
           export ARCH=arm64
           export SUBARCH=arm64
           export LD=ld.lld
