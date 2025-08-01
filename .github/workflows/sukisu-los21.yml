@@ -113,8 +113,18 @@ jobs:
     
           # 5. Apply the core SUSFS patch + copy helpers
           patch -p1 < patches/susfs4ksu/kernel_patches/50_add_susfs_in_kernel-4.14.patch || true
-          cp -r patches/susfs4ksu/kernel_patches/common/include/linux/* include/linux/ 2>/dev/null || :
-          cp -r patches/susfs4ksu/kernel_patches/common/fs/* fs/ 2>/dev/null || :
+          # CRITICAL FIX: Ensure all SUSFS headers are properly copied
+          # Find all SUSFS headers in the patch directory
+          find patches/susfs4ksu/kernel_patches -name '*.h' -exec cp -v --parents {} . \;
+          
+          # Alternative: Copy entire SUSFS header directories
+          if [ -d "patches/susfs4ksu/kernel_patches/common/include/linux" ]; then
+            cp -r patches/susfs4ksu/kernel_patches/common/include/linux/* include/linux/
+          fi
+          if [ -d "patches/susfs4ksu/kernel_patches/include/linux" ]; then
+            cp -r patches/susfs4ksu/kernel_patches/include/linux/* include/linux/
+          fi
+    
     
           # 6. (opt) ZRAM/LZ4K + LZ4KD support
           if [ "$ZRAM" = "true" ]; then
@@ -200,7 +210,13 @@ jobs:
             echo "CONFIG_CRYPTO_842=y"             >> "$DEFCONFIG"
             echo "CONFIG_ZRAM_WRITEBACK=y"         >> "$DEFCONFIG"
           fi
-
+          # Verify SUSFS headers exist
+          if [ ! -f "include/linux/susfs_def.h" ]; then
+            echo "ERROR: susfs_def.h still missing after copy attempts!"
+            echo "Searching for susfs headers in patches directory:"
+            find patches/susfs4ksu -name 'susfs*.h'
+            exit 1
+          fi
       - name: Setup LOS 21
         run: |
           export KERNEL_DEFCONFIG="lineage_sm8150_defconfig"
