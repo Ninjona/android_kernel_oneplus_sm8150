@@ -106,7 +106,7 @@ jobs:
           mkdir -p patches
           cd patches
           git clone --single-branch \
-            -b kernel-${KERNEL_VERSION%.*} \
+            -b kernel-4.14 \
             https://gitlab.com/simonpunk/susfs4ksu.git susfs4ksu
           git clone https://github.com/ShirkNeko/SukiSU_patch.git
           cd ..
